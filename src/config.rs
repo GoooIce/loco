@@ -32,7 +32,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::info;
 
-use crate::{controller::middleware, environment::Environment, logger, scheduler, Error, Result};
+use crate::{
+    controller::middleware, environment::Environment, i18n, logger, scheduler, Error, Result,
+};
 
 static DEFAULT_FOLDER: OnceLock<PathBuf> = OnceLock::new();
 
@@ -73,6 +75,12 @@ pub struct Config {
     pub settings: Option<serde_json::Value>,
 
     pub scheduler: Option<scheduler::Config>,
+    #[cfg(feature = "mcp")]
+    #[serde(default)]
+    pub mcp: McpConfig,
+    #[cfg(feature = "i18n")]
+    #[serde(default)]
+    pub i18n: i18n::I18nConfig,
 }
 
 /// Logger configuration
@@ -222,8 +230,8 @@ pub struct Database {
     pub dangerously_recreate: bool,
 
     // Execute query after initializing the DB
-    /// for e.g. this can be used to confiure PRAGMAs for `SQLite` where you can pass all values as a string.
-    /// Default values are:
+    /// for e.g. this can be used to confiure PRAGMAs for `SQLite` where you can
+    /// pass all values as a string. Default values are:
     ///
     /// PRAGMA `foreign_keys` = ON;
     ///
@@ -427,7 +435,8 @@ pub enum JWTLocation {
     Cookie { name: String },
 }
 
-/// Configuration for JWT location(s) - supports both single location and multiple locations
+/// Configuration for JWT location(s) - supports both single location and
+/// multiple locations
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum JWTLocationConfig {
@@ -574,6 +583,165 @@ pub struct MailerAuth {
     pub user: String,
     /// Password
     pub password: String,
+}
+
+/// MCP (Model Context Protocol) server configuration
+///
+/// Configure the MCP server integration with your Loco application.
+/// This allows your app to expose tools, resources, and prompts to MCP clients.
+///
+/// Example:
+/// ```yaml
+/// mcp:
+///   enable: true
+///   host: "0.0.0.0"
+///   port: 8080
+///   path: "/mcp"
+///   cors:
+///     allow_origins:
+///       - "http://localhost:3000"
+///     allow_methods:
+///       - "POST"
+///       - "GET"
+///     allow_headers:
+///       - "Content-Type"
+///       - "Authorization"
+/// ```
+#[cfg(feature = "mcp")]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct McpConfig {
+    /// Enable MCP server
+    pub enable: bool,
+
+    /// Server host address
+    #[serde(default = "default_mcp_host")]
+    pub host: String,
+
+    /// Server port
+    #[serde(default = "default_mcp_port")]
+    pub port: u16,
+
+    /// MCP endpoint path
+    #[serde(default = "default_mcp_path")]
+    pub path: String,
+
+    /// WebSocket endpoint path
+    #[serde(default = "default_mcp_ws_path")]
+    pub ws_path: String,
+
+    /// CORS configuration
+    #[serde(default)]
+    pub cors: McpCorsConfig,
+
+    /// Authentication configuration
+    #[serde(default)]
+    pub auth: McpAuthConfig,
+
+    /// Tool execution timeout in seconds
+    #[serde(default = "default_mcp_timeout")]
+    pub timeout: u64,
+
+    /// Maximum request size in bytes
+    #[serde(default = "default_mcp_max_request_size")]
+    pub max_request_size: usize,
+
+    /// Enable WebSocket transport
+    #[serde(default = "default_mcp_enable_websocket")]
+    pub enable_websocket: bool,
+}
+
+/// MCP CORS configuration
+#[cfg(feature = "mcp")]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct McpCorsConfig {
+    /// Allowed origins
+    #[serde(default)]
+    pub allow_origins: Vec<String>,
+
+    /// Allowed methods
+    #[serde(default = "default_mcp_cors_methods")]
+    pub allow_methods: Vec<String>,
+
+    /// Allowed headers
+    #[serde(default = "default_mcp_cors_headers")]
+    pub allow_headers: Vec<String>,
+
+    /// Allow credentials
+    #[serde(default = "default_mcp_cors_credentials")]
+    pub allow_credentials: bool,
+}
+
+/// MCP authentication configuration
+#[cfg(feature = "mcp")]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct McpAuthConfig {
+    /// Enable authentication
+    pub enable: bool,
+
+    /// API key for authentication
+    pub api_key: Option<String>,
+
+    /// JWT secret for authentication
+    pub jwt_secret: Option<String>,
+
+    /// Token expiration time in seconds
+    #[serde(default = "default_mcp_token_expiration")]
+    pub token_expiration: u64,
+}
+
+#[cfg(feature = "mcp")]
+fn default_mcp_host() -> String {
+    "127.0.0.1".to_string()
+}
+
+#[cfg(feature = "mcp")]
+fn default_mcp_port() -> u16 {
+    8080
+}
+
+#[cfg(feature = "mcp")]
+fn default_mcp_path() -> String {
+    "/mcp".to_string()
+}
+
+#[cfg(feature = "mcp")]
+fn default_mcp_ws_path() -> String {
+    "/mcp/ws".to_string()
+}
+
+#[cfg(feature = "mcp")]
+fn default_mcp_timeout() -> u64 {
+    30
+}
+
+#[cfg(feature = "mcp")]
+fn default_mcp_max_request_size() -> usize {
+    1024 * 1024 // 1MB
+}
+
+#[cfg(feature = "mcp")]
+fn default_mcp_enable_websocket() -> bool {
+    true
+}
+
+#[cfg(feature = "mcp")]
+fn default_mcp_cors_methods() -> Vec<String> {
+    vec!["POST".to_string(), "GET".to_string(), "OPTIONS".to_string()]
+}
+
+#[cfg(feature = "mcp")]
+fn default_mcp_cors_headers() -> Vec<String> {
+    vec!["Content-Type".to_string(), "Authorization".to_string()]
+}
+
+#[cfg(feature = "mcp")]
+fn default_mcp_cors_credentials() -> bool {
+    false
+}
+
+#[cfg(feature = "mcp")]
+fn default_mcp_token_expiration() -> u64 {
+    3600 // 1 hour
 }
 
 impl Config {

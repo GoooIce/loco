@@ -1,8 +1,7 @@
-//! This module contains the core components and traits for building a web
-//! server application.
-#[cfg(feature = "with-db")]
-use {sea_orm::DatabaseConnection, std::path::Path};
-
+//! Loco 应用程序模块
+//!
+//! 这个模块包含了构建 Web 服务器应用程序的核心组件和 trait。
+//! 它定义了应用程序的核心结构、生命周期钩子和类型安全的数据存储。
 use std::{
     any::{Any, TypeId},
     net::SocketAddr,
@@ -12,6 +11,8 @@ use std::{
 use async_trait::async_trait;
 use axum::Router as AxumRouter;
 use dashmap::DashMap;
+#[cfg(feature = "with-db")]
+use {sea_orm::DatabaseConnection, std::path::Path};
 
 use crate::{
     bgworker::{self, Queue},
@@ -29,10 +30,12 @@ use crate::{
     Result,
 };
 
-/// Type-safe heterogeneous storage for arbitrary application data
+/// 类型安全的异构应用程序数据存储
+///
+/// 用于在应用程序中存储不同类型的数据，使用 DashMap 实现线程安全访问。
 #[derive(Default, Debug)]
 pub struct SharedStore {
-    // Use DashMap for concurrent access with fine-grained locking
+    // 使用 DashMap 实现并发访问，具有细粒度锁定机制
     storage: DashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
@@ -64,7 +67,8 @@ impl SharedStore {
 
     /// Remove a value of type T from the shared store
     ///
-    /// Returns `Some(T)` if the value was present and removed, `None` otherwise.
+    /// Returns `Some(T)` if the value was present and removed, `None`
+    /// otherwise.
     ///
     /// # Example
     /// ```
@@ -245,48 +249,52 @@ impl<T: 'static + Send + Sync> std::ops::Deref for RefGuard<'_, T> {
 
 /// Represents the application context for a web server.
 ///
-/// This struct encapsulates various components and configurations required by
-/// the web server to operate. It is typically used to store and manage shared
-/// resources and settings that are accessible throughout the application's
-/// lifetime.
+/// Loco 应用上下文结构体
+///
+/// 此结构体封装了 Web
+/// 服务器运行所需的各种组件和配置。
+/// 它通常用于存储和管理在整个应用程序生命周期中可访问的共享资源和设置。
 #[derive(Clone)]
 #[allow(clippy::module_name_repetitions)]
 pub struct AppContext {
-    /// The environment in which the application is running.
+    /// 应用运行的环境信息
     pub environment: Environment,
     #[cfg(feature = "with-db")]
-    /// A database connection used by the application.
+    /// 应用程序使用的数据库连接
     pub db: DatabaseConnection,
-    /// Queue provider
+    /// 队列提供者，用于后台任务处理
     pub queue_provider: Option<Arc<bgworker::Queue>>,
-    /// Configuration settings for the application
+    /// 应用配置设置
     pub config: Config,
-    /// An optional email sender component that can be used to send email.
+    /// 可选的邮件发送组件，可用来发送电子邮件
     pub mailer: Option<EmailSender>,
-    // An optional storage instance for the application
+    /// 应用程序的可选存储实例
     pub storage: Arc<Storage>,
-    // Cache instance for the application
+    /// 应用程序缓存实例
     pub cache: Arc<cache::Cache>,
-    /// Shared store for arbitrary application data
+    /// 用于存储任意应用程序数据的共享存储器
     pub shared_store: Arc<SharedStore>,
 }
 
 /// A trait that defines hooks for customizing and extending the behavior of a
 /// web server application.
 ///
-/// Users of the web server application should implement this trait to customize
-/// the application's routing, worker connections, task registration, and
-/// database actions according to their specific requirements and use cases.
+/// Web 服务器应用程序的钩子 trait。
+///
+/// 应用程序用户需实现此 trait
+/// 来根据特定需求和使用场景自定义应用程序的路由、工作进程连接、
+/// 任务注册以及数据库操作。
 #[async_trait]
 pub trait Hooks: Send {
-    /// Defines the composite app version
+    /// 定义应用程序的综合版本号
     #[must_use]
     fn app_version() -> String {
         "dev".to_string()
     }
-    /// Defines the crate name
+
+    /// 定义 crate 的名称
     ///
-    /// Example
+    /// 示例代码:
     /// ```rust
     /// fn app_name() -> &'static str {
     ///     env!("CARGO_CRATE_NAME")
@@ -294,22 +302,20 @@ pub trait Hooks: Send {
     /// ```
     fn app_name() -> &'static str;
 
-    /// Initializes and boots the application based on the specified mode and
-    /// environment.
+    /// 根据指定的模式和环境初始化并启动应用程序。
     ///
-    /// The boot initialization process may vary depending on whether a DB
-    /// migrator is used or not.
+    /// 启动初始化过程可能会根据是否使用 DB migrator 而有所不同。
     ///
-    /// # Examples
+    /// # 示例代码
     ///
-    /// With DB:
+    /// 带有数据库的场景:
     /// ```rust,ignore
     /// async fn boot(mode: StartMode, environment: &str, config: Config) -> Result<BootResult> {
     ///     create_app::<Self, Migrator>(mode, environment, config).await
     /// }
     /// ````
     ///
-    /// Without DB:
+    /// 不带数据库的场景:
     /// ```rust,ignore
     /// async fn boot(mode: StartMode, environment: &str, config: Config) -> Result<BootResult> {
     ///     create_app::<Self>(mode, environment, config).await
@@ -317,16 +323,15 @@ pub trait Hooks: Send {
     /// ````
     ///
     ///
-    /// # Errors
-    /// Could not boot the application
+    /// # 错误处理
+    /// 如果无法启动应用程序则返回错误
     async fn boot(mode: StartMode, environment: &Environment, config: Config)
         -> Result<BootResult>;
 
-    /// Start serving the Axum web application on the specified address and
-    /// port.
+    /// 启动 Axum Web 应用服务器，在指定的地址和端口上监听。
     ///
-    /// # Returns
-    /// A Result indicating success () or an error if the server fails to start.
+    /// # 返回值
+    /// 成功时返回 Result<()>，服务器启动失败则返回错误。
     async fn serve(app: AxumRouter, ctx: &AppContext, serve_params: &ServeParams) -> Result<()> {
         let listener = tokio::net::TcpListener::bind(&format!(
             "{}:{}",
@@ -349,95 +354,87 @@ pub trait Hooks: Send {
         Ok(())
     }
 
-    /// Override and return `Ok(true)` to provide an alternative logging and
-    /// tracing stack of your own.
-    /// When returning `Ok(true)`, Loco will *not* initialize its own logger,
-    /// so you should set up a complete tracing and logging stack.
+    /// 覆盖并返回 `Ok(true)` 以提供自定义的日志和 tracing 系统。
+    /// 当返回 `Ok(true)` 时，Loco 将不会初始化自己的日志器，
+    /// 因此您需要设置完整的 tracing 和 logging 系统。
     ///
-    /// # Errors
-    /// If fails returns an error
+    /// # 错误处理
+    /// 失败时返回错误
     fn init_logger(_ctx: &AppContext) -> Result<bool> {
         Ok(false)
     }
 
-    /// Loads the configuration settings for the application based on the given environment.
+    /// 根据给定环境加载应用程序的配置设置。
     ///
-    /// This function is responsible for retrieving the configuration for the application
-    /// based on the current environment.
+    /// 此函数负责基于当前环境检索应用程序的配置信息。
     async fn load_config(env: &Environment) -> Result<Config> {
         env.load()
     }
 
-    /// Returns the initial Axum router for the application, allowing the user
-    /// to control the construction of the Axum router. This is where a fallback
-    /// handler can be installed before middleware or other routes are added.
+    /// 返回应用程序的初始 Axum router，允许用户控制 Axum router 的构建过程。
+    /// 这里可以安装 fallback handler，在中间件或其它路由之前添加。
     ///
-    /// # Errors
-    /// Return an [`Result`] when the router could not be created
+    /// # 错误处理
+    /// 当 router 无法创建时返回 [`Result`]
     async fn before_routes(_ctx: &AppContext) -> Result<AxumRouter<AppContext>> {
         Ok(AxumRouter::new())
     }
 
-    /// Invoke this function after the Loco routers have been constructed. This
-    /// function enables you to configure custom Axum logics, such as layers,
-    /// that are compatible with Axum.
+    /// 在 Loco router 构建完成后调用此函数。
+    /// 此函数允许用户配置自定义的 Axum 逻辑，例如 layers，
+    /// 这些逻辑与 Axum 兼容。
     ///
-    /// # Errors
-    /// Axum router error
+    /// # 错误处理
+    /// Axum router 的错误情况
     async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
         Ok(router)
     }
 
-    /// Provide a list of initializers
-    /// An initializer can be used to seamlessly add functionality to your app
-    /// or to initialize some aspects of it.
+    /// 提供初始化器列表。
+    /// 初始化器可用于无缝地向应用程序添加功能或初始化某些方面。
     async fn initializers(_ctx: &AppContext) -> Result<Vec<Box<dyn Initializer>>> {
         Ok(vec![])
     }
 
-    /// Provide a list of middlewares
+    /// 提供中间件列表。
     #[must_use]
     fn middlewares(ctx: &AppContext) -> Vec<Box<dyn MiddlewareLayer>> {
         middleware::default_middleware_stack(ctx)
     }
 
-    /// Calling the function before run the app
-    /// You can now code some custom loading of resources or other things before
-    /// the app runs
+    /// 在应用程序运行之前调用此函数。
+    /// 您现在可以在应用程序运行前编写一些自定义的资源加载或其它操作。
     async fn before_run(_app_context: &AppContext) -> Result<()> {
         Ok(())
     }
 
-    /// Defines the application's routing configuration.
+    /// 定义应用程序的路由配置。
     fn routes(_ctx: &AppContext) -> AppRoutes;
 
-    // Provides the options to change Loco [`AppContext`] after initialization.
+    /// 提供初始化后更改 Loco [`AppContext`] 的选项。
     async fn after_context(ctx: AppContext) -> Result<AppContext> {
         Ok(ctx)
     }
 
-    /// Connects custom workers to the application using the provided
-    /// [`Processor`] and [`AppContext`].
+    /// 使用提供的 [`Processor`] 和 [`AppContext`]
+    /// 连接自定义工作进程到应用程序。
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()>;
 
-    /// Registers custom tasks with the provided [`Tasks`] object.
+    /// 使用提供的 [`Tasks`] 对象注册自定义任务。
     fn register_tasks(tasks: &mut Tasks);
 
-    /// Truncates the database as required. Users should implement this
-    /// function. The truncate controlled from the [`crate::config::Database`]
-    /// by changing `dangerously_truncate` to true (default false).
-    /// Truncate can be useful when you want to truncate the database before any
-    /// test.
+    /// 如需截断数据库，则执行此功能。用户应该实现此函数。
+    /// 截断通过 [`crate::config::Database`] 中的 dangerously_truncate 设置控制,
+    /// 默认为 false。截断在测试前需要清空数据库时非常有用。
     #[cfg(feature = "with-db")]
     async fn truncate(_ctx: &AppContext) -> Result<()>;
 
-    /// Seeds the database with initial data.
+    /// 使用初始数据填充数据库。
     #[cfg(feature = "with-db")]
     async fn seed(_ctx: &AppContext, path: &Path) -> Result<()>;
 
-    /// Called when the application is shutting down.
-    /// This function allows users to perform any necessary cleanup or final
-    /// actions before the application stops completely.
+    /// 当应用程序准备关闭时调用此函数。
+    /// 此函数允许用户在应用程序完全停止前执行任何必要的清理或最终操作。
     async fn on_shutdown(_ctx: &AppContext) {}
 }
 
@@ -468,8 +465,9 @@ pub trait Initializer: Sync + Send {
     }
 
     /// Perform health checks for this initializer.
-    /// This method is called during the doctor command to validate the initializer's configuration.
-    /// Return `None` if no check is needed, or `Some(Check)` if a check should be performed.
+    /// This method is called during the doctor command to validate the
+    /// initializer's configuration. Return `None` if no check is needed, or
+    /// `Some(Check)` if a check should be performed.
     async fn check(&self, _app_context: &AppContext) -> Result<Option<crate::doctor::Check>> {
         Ok(None)
     }
@@ -632,8 +630,8 @@ mod tests {
 
         assert_eq!(shared_store.get::<String>(), None);
         assert!(shared_store.get::<CloneableTestService>().is_some());
-        // The following line correctly fails to compile because TestService doesn't impl Clone,
-        // which is required by the `get` method.
+        // The following line correctly fails to compile because TestService
+        // doesn't impl Clone, which is required by the `get` method.
         // let non_existent_clone = shared_store.get::<TestService>();
     }
 

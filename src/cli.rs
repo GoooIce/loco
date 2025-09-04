@@ -14,15 +14,13 @@
 //!     cli::main::<App, Migrator>().await
 //! }
 //! ```
-#[cfg(feature = "with-db")]
-use {crate::boot::run_db, crate::db, sea_orm_migration::MigratorTrait};
+use std::{collections::BTreeMap, fmt::Write, path::PathBuf, process::exit};
 
 use clap::{ArgAction, ArgGroup, Parser, Subcommand, ValueHint};
 use colored::Colorize;
 use duct::cmd;
-use std::fmt::Write;
-use std::process::exit;
-use std::{collections::BTreeMap, path::PathBuf};
+#[cfg(feature = "with-db")]
+use {crate::boot::run_db, crate::db, sea_orm_migration::MigratorTrait};
 
 #[cfg(any(feature = "bg_redis", feature = "bg_pg", feature = "bg_sqlt"))]
 use crate::bgworker::JobStatus;
@@ -67,7 +65,8 @@ enum Commands {
     #[command(group(ArgGroup::new("start_mode").args(&["worker", "server_and_worker", "all"])))]
     #[clap(alias("s"))]
     Start {
-        /// Start worker. Optionally provide tags to run specific jobs (e.g. --worker=tag1,tag2)
+        /// Start worker. Optionally provide tags to run specific jobs (e.g.
+        /// --worker=tag1,tag2)
         #[arg(short, long, action, value_delimiter = ',', num_args = 0.., conflicts_with_all = &["server_and_worker", "all"])]
         worker: Option<Vec<String>>,
         /// Start the server and worker in the same process
@@ -89,6 +88,7 @@ enum Commands {
     #[cfg(feature = "with-db")]
     /// Perform DB operations
     Db {
+        /// 要执行的数据库命令
         #[command(subcommand)]
         command: DbCommands,
     },
@@ -112,6 +112,7 @@ enum Commands {
     #[cfg(any(feature = "bg_redis", feature = "bg_pg", feature = "bg_sqlt"))]
     /// Managing jobs queue.
     Jobs {
+        /// 要执行的工作命令
         #[command(subcommand)]
         command: JobsCommands,
     },
@@ -137,13 +138,13 @@ enum Commands {
     #[cfg(debug_assertions)]
     #[clap(alias("g"))]
     Generate {
-        /// What to generate
+        /// 要生成的内容类型
         #[command(subcommand)]
         component: ComponentArg,
     },
     /// Validate and diagnose configurations.
     Doctor {
-        /// print out the current configurations.
+        /// 打印当前的配置信息。
         #[arg(short, long, action)]
         config: bool,
         #[arg(short, long, action)]
@@ -155,11 +156,11 @@ enum Commands {
     /// Watch and restart the app
     #[clap(alias("w"))]
     Watch {
-        /// start worker
+        /// 启动 worker
         #[arg(short, long, action, value_delimiter = ',', num_args = 0..)]
         worker: Option<Vec<String>>,
-        /// start same-process server and worker
-        #[arg(short, long, action)]
+        /// 启动同一进程的服务器和 worker
+        #[arg(long, conflicts_with_all = &["worker"])]
         server_and_worker: bool,
     },
 }
@@ -171,7 +172,7 @@ enum ComponentArg {
     /// Generates a new model file for defining the data structure of your
     /// application, and test file logic.
     #[command(after_help = format!(
-    "{}  
+    "{}
   - Generate empty model:
       $ cargo loco g model posts
 
@@ -289,7 +290,7 @@ After running the migration, follow these steps to complete the process:
     },
     /// Generate a new controller with the given controller name, and test file.
     #[command(after_help = format!(
-    "{}  
+    "{}
   - Generate an empty controller:
       $ cargo loco generate controller posts --api
 
@@ -419,7 +420,9 @@ impl ComponentArg {
                     loco_gen::ScaffoldKind::Api
                 } else {
                     return Err(crate::Error::string(
-                        "Error: generating this component requires one of `--kind`, `--htmx`, `--html`, or `--api` to be specified. Run with `--help` for more information.",
+                        "Error: generating this component requires one of `--kind`, `--htmx`, \
+                         `--html`, or `--api` to be specified. Run with `--help` for more \
+                         information.",
                     ));
                 };
 
@@ -847,8 +850,8 @@ pub async fn main<H: Hooks, M: MigratorTrait>() -> crate::Result<()> {
 
             cmd("cargo-watch", &["-s", &cmd_str]).run().map_err(|err| {
                 Error::Message(format!(
-                    "failed to start with `cargo-watch`. Did you `cargo install \
-                         cargo-watch`?. error details: `{err}`",
+                    "failed to start with `cargo-watch`. Did you `cargo install cargo-watch`?. \
+                     error details: `{err}`",
                 ))
             })?;
         }
@@ -983,8 +986,8 @@ pub async fn main<H: Hooks>() -> crate::Result<()> {
 
             cmd("cargo-watch", &["-s", &cmd_str]).run().map_err(|err| {
                 Error::Message(format!(
-                    "failed to start with `cargo-watch`. Did you `cargo install \
-                         cargo-watch`?. error details: `{err}`",
+                    "failed to start with `cargo-watch`. Did you `cargo install cargo-watch`?. \
+                     error details: `{err}`",
                 ))
             })?;
         }

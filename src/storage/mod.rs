@@ -1,15 +1,13 @@
-//! # Storage Module
+//! # Storage 模块
 //!
-//! This module defines a generic storage abstraction represented by the
-//! [`Storage`] struct. It provides methods for performing common storage
-//! operations such as upload, download, delete, rename, and copy.
+//! 此模块定义了通用的存储抽象，由 [`Storage`] 结构体表示。
+//! 它提供了执行常见存储操作的方法，如上传、下载、删除、重命名和复制。
 //!
-//! ## Storage Strategy
+//! ## 存储策略
 //!
-//! The [`Storage`] struct is designed to work with different storage
-//! strategies. A storage strategy defines the behavior of the storage
-//! operations. Strategies implement the [`strategies::StorageStrategy`].
-//! The selected strategy can be dynamically changed at runtime.
+//! [`Storage`] 结构体设计用于处理不同的存储策略。
+//! 存储策略定义了存储操作的行为。策略实现了 [`strategies::StorageStrategy`]
+//! trait。 可以在运行时动态更改选定的策略。
 mod contents;
 pub mod drivers;
 pub mod strategies;
@@ -219,7 +217,7 @@ impl Storage {
     /// # Errors
     ///
     /// This method returns an error if the delete operation fails or if there
-    /// is an issue with the strategy configuration.    
+    /// is an issue with the strategy configuration.
     pub async fn delete_with_policy(
         &self,
         path: &Path,
@@ -242,7 +240,7 @@ impl Storage {
     ///     let path = Path::new("example.txt");
     ///     let content = "Loco!";
     ///     storage.upload(path, &Bytes::from(content)).await;
-    ///     
+    ///
     ///     let new_path = Path::new("new_path.txt");
     ///     let store = storage.as_store("default").unwrap();
     ///     assert!(storage.rename(&path, &new_path).await.is_ok());
@@ -292,7 +290,7 @@ impl Storage {
     ///     let path = Path::new("example.txt");
     ///     let content = "Loco!";
     ///     storage.upload(path, &Bytes::from(content)).await;
-    ///     
+    ///
     ///     let new_path = Path::new("new_path.txt");
     ///     let store = storage.as_store("default").unwrap();
     ///     assert!(storage.copy(&path, &new_path).await.is_ok());

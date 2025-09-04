@@ -30,6 +30,8 @@ default = [
     "bg_redis",
     "bg_pg",
     "bg_sqlt",
+    "mcp",
+    "i18n",
 ]
 auth_jwt = ["dep:jsonwebtoken"]
 cli = ["dep:clap"]
@@ -51,6 +53,10 @@ cache_redis = ["dep:bb8-redis", "dep:bb8"]
 bg_redis = ["dep:redis", "dep:ulid"]
 bg_pg = ["dep:sqlx", "dep:ulid"]
 bg_sqlt = ["dep:sqlx", "dep:ulid"]
+# MCP server support
+mcp = ["dep:rmcp", "dep:tokio-tungstenite", "dep:reqwest"]
+# Internationalization support
+i18n = []
 ## Testing feature flags
 integration_test = []
 # Embed assets into binary
@@ -155,6 +161,11 @@ ulid = { version = "1", optional = true }
 
 # bg_redis: redis workers
 redis = { version = "0.31", features = ["aio", "tokio-comp"], optional = true }
+
+# MCP server dependencies
+rmcp = { version = "0.6", optional = true }
+tokio-tungstenite = { version = "0.20", optional = true }
+reqwest = { version = "0.12", features = ["json"], optional = true }
 
 scraper = { version = "0.21.0", features = ["deterministic"], optional = true }
 

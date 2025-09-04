@@ -32,32 +32,33 @@ use crate::{
     Result,
 };
 
-/// Represents the application startup mode.
+/// 应用程序启动模式定义
+///
+/// 定义了应用程序可以使用的不同启动模式以适应不同的部署需求。
 #[derive(Debug)]
 pub enum StartMode {
-    /// Run the application as a server only. when running web server only,
-    /// workers job will not handle.
+    /// 仅运行 Web 服务器模式。在此模式下，不处理后台 worker。
     ServerOnly,
-    /// Run the application web server and the worker in the same process.
+    /// 同时运行 Web 服务器和 worker 的模式（在同一进程中）。
     ServerAndWorker,
-    /// Pulling job worker and execute them
+    /// 后台任务执行者模式
     WorkerOnly {
-        /// Specifies that the worker should only handle jobs associated with one of these tags.
-        /// If empty, the worker handles all jobs.
+        /// 指定 worker 只处理与这些标签关联的任务。
+        /// 如果为空，则 worker 处理所有任务。
         tags: Vec<String>,
     },
-    /// Run the app with all available components in the same process.
+    /// 在同一进程中运行应用程序的所有可用组件模式。
     All,
 }
 
 pub struct BootResult {
-    /// Application Context
+    /// 应用上下文
     pub app_context: AppContext,
-    /// Web server routes
+    /// Web 服务器路由
     pub router: Option<Router>,
-    /// worker processor
+    /// worker 处理器列表
     pub worker: Option<Vec<String>>,
-    /// scheduler processor
+    /// 是否运行调度器进程
     pub run_scheduler: bool,
 }
 
@@ -144,6 +145,9 @@ pub async fn start<H: Hooks>(
     Ok(())
 }
 
+/// 启动后台任务处理器
+///
+/// 在当前进程中启动 worker，处理队列中的后台任务。
 fn start_queue_worker(app_context: &AppContext, tags: Vec<String>) -> Result<JoinHandle<()>> {
     debug!("note: worker is run in-process (tokio spawn)");
 
@@ -164,6 +168,9 @@ fn start_queue_worker(app_context: &AppContext, tags: Vec<String>) -> Result<Joi
     Err(Error::QueueProviderMissing)
 }
 
+/// 关闭并等待后台任务处理器完成
+///
+/// 在应用程序关闭前，安全地停止 worker 并等待它完成正在执行的任务。
 async fn shutdown_and_await_queue_worker(
     app_context: &AppContext,
     handle: JoinHandle<()>,
@@ -206,7 +213,8 @@ pub async fn run_task<H: Hooks>(
     Ok(())
 }
 
-/// Initializes a new scheduler instance based on the provided configuration and context.
+/// Initializes a new scheduler instance based on the provided configuration and
+/// context.
 fn scheduler<H: Hooks>(
     app_context: &AppContext,
     config: Option<&PathBuf>,
@@ -492,7 +500,8 @@ pub async fn run_app<H: Hooks>(mode: &StartMode, app_context: AppContext) -> Res
     }
 }
 
-/// Sets up the application's routes based on the provided initializers and hooks.
+/// Sets up the application's routes based on the provided initializers and
+/// hooks.
 async fn setup_routes<H: Hooks>(
     app_context: &AppContext,
     initializers: &[Box<dyn Initializer>],

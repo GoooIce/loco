@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="{{ i18n.current_language_code }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title | default("Welcome") }} - {{ i18n.current_language_display }}</title>
+    <style>
+        body { font-family: {{ i18n.is_east_asian | then("'Microsoft YaHei', 'Hiragino Sans GB', sans-serif") | else("'Arial', sans-serif") }}; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: #f8f9fa; padding: 1rem; margin-bottom: 2rem; }
+        .language-switcher { float: right; }
+        .language-switcher a { margin: 0 0.5rem; text-decoration: none; }
+        .language-switcher a:hover { text-decoration: underline; }
+        .nav { margin-bottom: 2rem; }
+        .nav ul { list-style: none; padding: 0; display: flex; gap: 1rem; }
+        .nav a { text-decoration: none; color: #007bff; }
+        .nav a:hover { text-decoration: underline; }
+        .content { line-height: 1.6; }
+        .footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #dee2e6; }
+        .translation-demo { background: #e9ecef; padding: 1rem; margin: 1rem 0; border-radius: 0.25rem; }
+        .error { color: #dc3545; }
+        .success { color: #28a745; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header with language switcher -->
+        <header class="header">
+            <div class="language-switcher">
+                <strong>{{ t(key="nav.language") }}:</strong>
+                {% for lang in i18n.supported_languages %}
+                    <a href="?lang={{ lang.current_language_code }}">{{ lang.current_language_native }}</a>
+                {% endfor %}
+            </div>
+            <h1>{{ title | default(t(key="nav.home")) }}</h1>
+            <p>{{ t(key="common.welcome") }}!</p>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav">
+            <ul>
+                <li><a href="/">{{ t(key="nav.home") }}</a></li>
+                <li><a href="/about">{{ t(key="nav.about") }}</a></li>
+                <li><a href="/profile">{{ t(key="nav.profile") }}</a></li>
+                <li><a href="/contact">{{ t(key="nav.contact") }}</a></li>
+                <li><a href="/lang-demo">{{ t(key="nav.lang_demo") }}</a></li>
+            </ul>
+        </nav>
+
+        <!-- Main content -->
+        <main class="content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Translation examples -->
+        <div class="translation-demo">
+            <h3>{{ t(key="nav.translation_examples") }}</h3>
+            
+            <h4>{{ t(key="common.basic_translations") }}</h4>
+            <ul>
+                <li>{{ t(key="common.hello") }}: {{ t(key="common.hello") }}</li>
+                <li>{{ t(key="common.thank_you") }}: {{ t(key="common.thank_you") }}</li>
+                <li>{{ t(key="common.please_wait") }}: {{ t(key="common.please_wait") }}</li>
+            </ul>
+
+            <h4>{{ t(key="common.form_elements") }}</h4>
+            <form>
+                <div>
+                    <label>{{ t(key="form.username") }}:</label>
+                    <input type="text" placeholder="{{ t(key="form.username") }}">
+                </div>
+                <div>
+                    <label>{{ t(key="form.email") }}:</label>
+                    <input type="email" placeholder="{{ t(key="form.email") }}">
+                </div>
+                <div>
+                    <label>{{ t(key="form.password") }}:</label>
+                    <input type="password" placeholder="{{ t(key="form.password") }}">
+                </div>
+                <div>
+                    <label>{{ t(key="form.description") }}:</label>
+                    <textarea placeholder="{{ t(key="form.description") }}"></textarea>
+                </div>
+                <div>
+                    <button type="submit">{{ t(key="form.submit") }}</button>
+                    <button type="reset">{{ t(key="form.reset") }}</button>
+                </div>
+            </form>
+
+            <h4>{{ t(key="common.validation_messages") }}</h4>
+            <div class="error">
+                <p>{{ t(key="validation.required_field") }}</p>
+                <p>{{ t(key="validation.invalid_email") }}</p>
+                <p>{{ t(key="validation.password_too_short") }}</p>
+            </div>
+
+            <h4>{{ t(key="common.success_messages") }}</h4>
+            <div class="success">
+                <p>{{ t(key="messages.save_success") }}</p>
+                <p>{{ t(key="messages.login_success") }}</p>
+            </div>
+
+            <h4>{{ t(key="common.parameterized_translations") }}</h4>
+            <p>{{ t(key="messages.welcome_user", params={name="张三"}) }}</p>
+            <p>{{ t(key="messages.message_count", params={count="5"}) }}</p>
+            <p>{{ t(key="messages.item_updated", params={item="Profile"}) }}</p>
+
+            <h4>{{ t(key="common.conditional_content") }}</h4>
+            {% if i18n.is_east_asian %}
+                <p>{{ t(key="messages.east_asian_features") }}</p>
+                <p>{{ t(key="messages.cjk_support") }}</p>
+            {% else %}
+                <p>{{ t(key="messages.western_features") }}</p>
+                <p>{{ t(key="messages.latin_support") }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>{{ t(key="footer.copyright", params={year="2024"}) }}</p>
+            <p>{{ t(key="footer.made_with") }} Loco i18n</p>
+        </footer>
+    </div>
+
+    <script>
+        // Client-side i18n example
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add language switcher functionality
+            const langLinks = document.querySelectorAll('.language-switcher a');
+            langLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const lang = this.getAttribute('href').split('=')[1];
+                    
+                    // Store language preference
+                    document.cookie = 'app_language=' + lang + '; path=/; max-age=31536000';
+                    
+                    // Reload page with new language
+                    window.location.href = window.location.pathname + '?lang=' + lang;
+                });
+            });
+
+            // Add translation indicators
+            const translationElements = document.querySelectorAll('[data-i18n]');
+            translationElements.forEach(element => {
+                const key = element.getAttribute('data-i18n');
+                if (key) {
+                    // In a real app, you would have client-side translations
+                    element.setAttribute('title', 'Translation key: ' + key);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
