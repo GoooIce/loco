@@ -74,7 +74,7 @@ impl Translations {
         file_path: &Path,
     ) -> super::I18nResult<()> {
         let content = fs::read_to_string(file_path)
-            .map_err(|e| I18nError::LoadFailed {
+            .map_err(|_e| I18nError::LoadFailed {
                 path: file_path.to_string_lossy().to_string(),
             })?;
 
@@ -95,7 +95,7 @@ impl Translations {
         file_path: &Path,
     ) -> super::I18nResult<()> {
         let content = fs::read_to_string(file_path)
-            .map_err(|e| I18nError::LoadFailed {
+            .map_err(|_e| I18nError::LoadFailed {
                 path: file_path.to_string_lossy().to_string(),
             })?;
 
@@ -213,7 +213,7 @@ impl Translations {
                 })?;
 
             fs::write(&file_path, content)
-                .map_err(|e| I18nError::LoadFailed {
+                .map_err(|_e| I18nError::LoadFailed {
                     path: file_path.to_string_lossy().to_string(),
                 })?;
         }

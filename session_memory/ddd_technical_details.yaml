@@ -1,0 +1,158 @@
+---
+memory_id: "loco_ddd_technical_details"
+session_id: "2025-09-05_ddd_framework_fix"
+timestamp: "2025-09-05T18:30:00Z"
+project: "/Users/devel0per/ai_work/loco"
+type: "TECHNICAL_SPEC"
+category: "DDD_INTEGRATION"
+
+# DDD Architecture Implementation
+ddd_patterns_implemented:
+  # Core DDD Concepts
+  entity:
+    description: "Base Entity trait with identity and equality"
+    location: "src/lib.rs"
+    methods: ["id()", "equals()", "domain_events()"]
+    status: "IMPLEMENTED"
+  
+  aggregate_root:
+    description: "AggregateRoot trait extending Entity"
+    location: "src/lib.rs"
+    methods: ["apply_event()", "clear_events()"]
+    status: "IMPLEMENTED"
+  
+  repository:
+    description: "Repository trait for aggregate persistence"
+    location: "src/lib.rs"
+    methods: ["find_by_id()", "save()", "delete()"]
+    status: "IMPLEMENTED"
+  
+  value_object:
+    description: "ValueObject trait for immutable domain objects"
+    location: "src/lib.rs"
+    methods: ["equals()", "validate()"]
+    status: "IMPLEMENTED"
+
+# Error Management System
+error_hierarchy:
+  domain_error:
+    base: "std::error::Error"
+    description: "Base error type for domain-specific errors"
+    fields: ["message: String", "code: String", "source: Option<Box<dyn Error>>"]
+    
+  validation_error:
+    inherits: "DomainError"
+    description: "Validation-specific errors"
+    fields: ["field: String", "value: Option<String>"]
+    
+  infrastructure_error:
+    inherits: "DomainError"
+    description: "Infrastructure-related errors"
+    fields: ["component: String", "operation: String"]
+
+# Async Integration
+async_patterns:
+  repository_traits:
+    - "Repository<Id, Entity>: async find_by_id(&self, id: Id) -> Result<Option<Entity>, DomainError>"
+    - "Repository<Id, Entity>: async save(&self, entity: &Entity) -> Result<(), DomainError>"
+    - "Repository<Id, Entity>: async delete(&self, id: Id) -> Result<(), DomainError>"
+  
+  service_patterns:
+    - "Domain services with async methods"
+    - "Application services with proper error handling"
+    - "Infrastructure services with retry logic"
+
+# Integration Points
+framework_integration:
+  loco_app:
+    description: "Integration with Loco App struct"
+    methods: ["domain_registry()", "event_dispatcher()"]
+    
+  storage_layer:
+    description: "Integration with existing storage abstractions"
+    pattern: "Repository pattern implementation"
+    
+  mcp_protocol:
+    description: "DDD-aware MCP tools for domain operations"
+    tools: ["entity_query", "aggregate_commands", "domain_events"]
+
+# Code Generation Templates
+generation_templates:
+  entity_template:
+    description: "Generate DDD entities with proper traits"
+    location: "loco-gen/templates/"
+    
+  aggregate_template:
+    description: "Generate aggregate roots with event sourcing"
+    location: "loco-gen/templates/"
+    
+  repository_template:
+    description: "Generate repository implementations"
+    location: "loco-gen/templates/"
+
+# Testing Strategy
+testing_approach:
+  unit_tests:
+    focus: "Individual domain objects and services"
+    tools: "cargo test"
+    
+  integration_tests:
+    focus: "Repository and service integration"
+    tools: "testcontainers, mockall"
+    
+  e2e_tests:
+    focus: "Complete DDD workflows"
+    tools: "axum-test, loco testing"
+
+# Performance Considerations
+performance_patterns:
+  caching:
+    description: "Domain object caching strategies"
+    implementation: "Redis cache integration"
+    
+  lazy_loading:
+    description: "Aggregate root lazy loading patterns"
+    implementation: "Optional field loading"
+    
+  event_sourcing:
+    description: "Domain event storage and replay"
+    implementation: "Event store pattern"
+
+# Security Considerations
+security_patterns:
+  authorization:
+    description: "Domain-aware authorization"
+    pattern: "Policy-based access control"
+    
+  validation:
+    description: "Input validation at domain boundaries"
+    pattern: "Specification pattern"
+    
+  audit_trail:
+    description: "Domain event auditing"
+    pattern: "Event sourcing with metadata"
+
+# Configuration Management
+configuration:
+  domain_settings:
+    file: "config/domain.yaml"
+    description: "DDD-specific configuration"
+    
+  repository_config:
+    file: "config/repositories.yaml"
+    description: "Repository implementation settings"
+    
+  event_config:
+    file: "config/events.yaml"
+    description: "Domain event handling configuration"
+
+# Migration Strategy
+migration_approach:
+  existing_models:
+    strategy: "Gradual DDD pattern adoption"
+    steps: ["Identify aggregates", "Extract domain logic", "Implement repositories"]
+    
+  new_features:
+    strategy: "DDD-first approach"
+    pattern: "Test-driven development with DDD patterns"
+...

@@ -44,14 +44,13 @@ impl I18nManager {
     }
 
     /// Translate a key to the specified language
-    pub fn translate(&self, language: &Language, key: &str) -> String {
+    pub async fn translate(&self, language: &Language, key: &str) -> String {
         let cache_key = format!("{}:{}", language.as_str(), key);
         
         // Try cache first
         let cache = self.cache.read().await;
         if let Some(cached) = cache.get(&cache_key) {
             return cached.clone();
-        }
         }
 
         // Get translation
@@ -60,13 +59,12 @@ impl I18nManager {
         // Cache the result
         let mut cache = self.cache.write().await;
         cache.insert(cache_key, translation.clone());
-    }
-
+        
         translation
     }
 
     /// Translate a key with parameters
-    pub fn translate_with_params(
+    pub async fn translate_with_params(
         &self,
         language: &Language,
         key: &str,
@@ -79,7 +77,6 @@ impl I18nManager {
         if let Some(cached) = cache.get(&cache_key) {
             return cached.clone();
         }
-        }
 
         // Get translation
         let translation = self.translations.translate_with_params(language, key, params);
@@ -87,8 +84,7 @@ impl I18nManager {
         // Cache the result
         let mut cache = self.cache.write().await;
         cache.insert(cache_key, translation.clone());
-    }
-
+        
         translation
     }
 
@@ -177,41 +173,36 @@ impl I18nManager {
     /// Clear cache for a specific language
     async fn clear_language_cache(&self, language: &Language) {
         let mut cache = self.cache.write().await;
-            let lang_prefix = format!("{}:", language.as_str());
-            cache.retain(|key, _| !key.starts_with(&lang_prefix));
-        }
+        let lang_prefix = format!("{}:", language.as_str());
+        cache.retain(|key, _| !key.starts_with(&lang_prefix));
     }
 
     /// Clear all cache
     pub async fn clear_cache(&self) {
         let mut cache = self.cache.write().await;
-            cache.clear();
-        }
+        cache.clear();
     }
 
     /// Get cache statistics
     pub async fn cache_stats(&self) -> HashMap<String, usize> {
         let cache = self.cache.read().await;
-            let mut stats = HashMap::new();
-            stats.insert("total_entries".to_string(), cache.len());
-            
-            let lang_counts: HashMap<String, usize> = cache
-                .keys()
-                .filter_map(|key| key.split(':').next())
-                .map(|s| s.to_string())
-                .fold(HashMap::new(), |mut acc, lang| {
-                    *acc.entry(lang).or_insert(0) += 1;
-                    acc
-                });
-            
-            for (lang, count) in lang_counts {
-                stats.insert(format!("lang_{}", lang), count);
-            }
-            
-            stats
-        } else {
-            HashMap::new()
+        let mut stats = HashMap::new();
+        stats.insert("total_entries".to_string(), cache.len());
+        
+        let lang_counts: HashMap<String, usize> = cache
+            .keys()
+            .filter_map(|key| key.split(':').next())
+            .map(|s| s.to_string())
+            .fold(HashMap::new(), |mut acc, lang| {
+                *acc.entry(lang).or_insert(0) += 1;
+                acc
+            });
+        
+        for (lang, count) in lang_counts {
+            stats.insert(format!("lang_{}", lang), count);
         }
+        
+        stats
     }
 
     /// Create a new translation file
@@ -224,7 +215,7 @@ impl I18nManager {
         
         // Create directory if it doesn't exist
         if let Some(parent) = file_path.parent() {
-            tokio::fs::create_dir_all(parent).await.map_err(|e| {
+            tokio::fs::create_dir_all(parent).await.map_err(|_e| {
                 I18nError::LoadFailed {
                     path: parent.to_string_lossy().to_string(),
                 }
@@ -237,7 +228,7 @@ impl I18nManager {
             }
         })?;
 
-        tokio::fs::write(&file_path, content).await.map_err(|e| {
+        tokio::fs::write(&file_path, content).await.map_err(|_e| {
             I18nError::LoadFailed {
                 path: file_path.to_string_lossy().to_string(),
             }
@@ -256,7 +247,7 @@ impl I18nManager {
         file_path: &Path,
         format: TranslationFormat,
     ) -> I18nResult<()> {
-        let content = tokio::fs::read_to_string(file_path).await.map_err(|e| {
+        let content = tokio::fs::read_to_string(file_path).await.map_err(|_e| {
             I18nError::LoadFailed {
                 path: file_path.to_string_lossy().to_string(),
             }
@@ -329,7 +320,7 @@ impl I18nManager {
             }
         };
 
-        tokio::fs::write(file_path, content).await.map_err(|e| {
+        tokio::fs::write(file_path, content).await.map_err(|_e| {
             I18nError::LoadFailed {
                 path: file_path.to_string_lossy().to_string(),
             }

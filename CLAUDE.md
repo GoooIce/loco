@@ -41,6 +41,7 @@ Loco is a Rust web framework inspired by Ruby on Rails, following convention ove
 - **Mailers**: Background email sending with template support
 - **Storage**: Abstracted file storage (local, AWS S3, GCP, Azure)
 - **Cache**: In-memory or Redis caching layer
+- **DDD Integration**: Domain-Driven Design patterns with Entity, AggregateRoot, Repository traits
 
 ### Key Architectural Patterns
 - **Boot System**: `boot.rs` handles application startup with different modes (ServerOnly, ServerAndWorker, WorkerOnly, All)
@@ -48,6 +49,7 @@ Loco is a Rust web framework inspired by Ruby on Rails, following convention ove
 - **Middleware**: Tower-based middleware stack for logging, CORS, security headers, etc.
 - **Configuration**: Environment-based configuration with YAML files
 - **Testing**: Integrated testing with `axum-test` and snapshot testing with `insta`
+- **Async Patterns**: Comprehensive async/await support using `#[async_trait]` macro
 
 ### Feature Flags
 - `auth_jwt` - JWT authentication support
@@ -57,6 +59,8 @@ Loco is a Rust web framework inspired by Ruby on Rails, following convention ove
 - `bg_redis`/`bg_pg`/`bg_sqlt` - Background worker backends
 - `storage_*` - Cloud storage providers
 - `cache_*` - Cache backends
+- `mcp` - Model Context Protocol server support
+- `i18n` - Internationalization support (Chinese, Japanese, English)
 
 ### Project Structure
 - `src/` - Core framework code
@@ -67,6 +71,7 @@ Loco is a Rust web framework inspired by Ruby on Rails, following convention ove
 - `tests/` - Framework tests
 - `examples/` - Example applications
 - `docs-site/` - Documentation website
+- `session_memory/` - Cross-session development context persistence
 
 ### Development Environment Requirements
 - Redis server running (for background jobs)
@@ -105,3 +110,41 @@ Supports multiple worker backends:
 - Static file serving
 - Embedded assets option
 - Frontend build integration (React, Vue, etc.)
+
+### Domain-Driven Design Integration
+The framework includes comprehensive DDD support:
+- **Entity Trait**: Base trait for domain entities with equality semantics
+- **AggregateRoot Trait**: Entities with event sourcing capabilities
+- **Repository Trait**: Generic data access abstraction
+- **ValueObject Trait**: Immutable value objects
+- **DomainError**: Comprehensive error hierarchy for domain-specific errors
+- **Result Types**: Consistent `Result<T, DomainError>` pattern throughout
+
+### MCP (Model Context Protocol) Support
+- Built-in MCP server for tool integration
+- Protocol handlers for request/response management
+- Tool registry for custom tool registration
+- HTTP and WebSocket transport support
+- Integration with existing Loco application context
+
+### Internationalization (i18n)
+- Multi-language support (Chinese, Japanese, English)
+- Language detection from headers, URL parameters, and cookies
+- Template integration with Tera
+- Fallback language support
+- Translation file management
+
+### Error Handling Patterns
+- Centralized error handling with `thiserror`
+- Context-aware error messages
+- Automatic error conversions using `From` traits
+- Domain-specific error hierarchy for DDD patterns
+- User-friendly error messages with actionable guidance
+
+### Async Patterns
+- Extensive use of `#[async_trait]` for trait implementations
+- Consistent async/await patterns throughout
+- Proper lifecycle management for async resources
+- Integration with Tokio runtime
+
+@docs/rust_compilation_best_practices.md

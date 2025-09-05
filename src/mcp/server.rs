@@ -45,7 +45,7 @@ impl McpServer {
                 crate::storage::drivers::null::new()
             )),
             cache: Arc::new(crate::cache::Cache::new(
-                Box::new(crate::cache::drivers::memory::Memory::new())
+                crate::cache::drivers::null::new()
             )),
             shared_store: Arc::new(crate::app::SharedStore::default()),
         };
@@ -79,7 +79,7 @@ impl McpServer {
         };
 
         // Create tool registry manager and register built-in tools
-        let tool_registry_manager = ToolRegistryManager::new(app_context.clone());
+        let mut tool_registry_manager = ToolRegistryManager::new(app_context.clone());
         tool_registry_manager.register_builtin_tools().await?;
 
         // Create protocol handler

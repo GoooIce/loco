@@ -128,7 +128,7 @@ pub struct HasTranslationFunction;
 
 impl Function for HasTranslationFunction {
     fn call(&self, args: &HashMap<String, Value>) -> TeraResult<Value> {
-        let key = args.get("key").and_then(|v| v.as_str()).ok_or_else(|| {
+        let _key = args.get("key").and_then(|v| v.as_str()).ok_or_else(|| {
             tera::Error::msg("has_translation() function requires a 'key' argument")
         })?;
         
