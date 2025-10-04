@@ -1,0 +1,275 @@
+# MCP Tools Contract Specification
+
+**Version**: 1.0
+**Created**: 2025-10-03
+
+## Tool Definitions
+
+### 1. loco.generate_model
+
+Generate a model and migration file for the specified fields.
+
+**Input Schema**:
+```yaml
+type: object
+properties:
+  model_name:
+    type: string
+    pattern: "^[a-z][a-z0-9_]*$"
+    maxLength: 64
+    description: "Model name in snake_case"
+  fields:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[a-z][a-z0-9_]*:(string|i32|i64|f32|f64|boolean|datetime|uuid|json|text)(:unique|:primary_key|:nullable|:optional)*$"
+    description: "Field definitions in format 'name:type[:constraints]'"
+required:
+  - model_name
+  - fields
+```
+
+**Output Schema**:
+```yaml
+type: object
+properties:
+  success:
+    type: boolean
+  created_files:
+    type: array
+    items:
+      type: object
+      properties:
+        path:
+          type: string
+        type:
+          type: string
+          enum: [model, migration]
+        size_bytes:
+          type: integer
+    description: "List of created files"
+  modified_files:
+    type: array
+    items:
+      type: object
+      properties:
+        path:
+          type: string
+        type:
+          type: string
+    description: "List of modified files"
+  errors:
+    type: array
+    items:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        field:
+          type: string
+    description: "Error messages if any"
+required:
+  - success
+```
+
+**Examples**:
+```yaml
+# Input
+model_name: "product"
+fields: ["name:string", "price:i32", "sku:string:unique"]
+
+# Output
+success: true
+created_files:
+  - path: "src/models/product.rs"
+    type: "model"
+    size_bytes: 245
+  - path: "migration/src/m_20251003_120001_create_products.rs"
+    type: "migration"
+    size_bytes: 189
+modified_files: []
+errors: []
+```
+
+### 2. loco.generate_scaffold
+
+Generate complete CRUD scaffolding (model, controller, views, routes).
+
+**Input Schema**:
+```yaml
+type: object
+properties:
+  model_name:
+    type: string
+    pattern: "^[a-z][a-z0-9_]*$"
+    maxLength: 64
+    description: "Model name in snake_case"
+  fields:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[a-z][a-z0-9_]*:(string|i32|i64|f32|f64|boolean|datetime|uuid|json|text)(:unique|:primary_key|:nullable|:optional)*$"
+    description: "Field definitions"
+  include_views:
+    type: boolean
+    default: true
+    description: "Generate view templates"
+  include_controllers:
+    type: boolean
+    default: true
+    description: "Generate controller"
+  api_only:
+    type: boolean
+    default: false
+    description: "API-only scaffolding (no views)"
+required:
+  - model_name
+  - fields
+```
+
+**Output Schema**: Same as `loco.generate_model`
+
+**Examples**:
+```yaml
+# Input
+model_name: "user"
+fields: ["email:string:unique", "name:string", "active:boolean"]
+include_views: true
+include_controllers: true
+api_only: false
+
+# Output
+success: true
+created_files:
+  - path: "src/models/user.rs"
+    type: "model"
+    size_bytes: 312
+  - path: "migration/src/m_20251003_120002_create_users.rs"
+    type: "migration"
+    size_bytes: 201
+  - path: "src/controllers/users.rs"
+    type: "controller"
+    size_bytes: 1567
+  - path: "src/views/users/index.html.tera"
+    type: "view"
+    size_bytes: 892
+  - path: "src/views/users/show.html.tera"
+    type: "view"
+    size_bytes: 456
+  - path: "src/views/users/form.html.tera"
+    type: "view"
+    size_bytes: 678
+modified_files:
+  - path: "src/routes/mod.rs"
+    type: "route"
+errors: []
+```
+
+### 3. loco.generate_controller_view
+
+Generate controller and views for an existing model.
+
+**Input Schema**:
+```yaml
+type: object
+properties:
+  model_name:
+    type: string
+    pattern: "^[a-z][a-z0-9_]*$"
+    maxLength: 64
+    description: "Name of existing model"
+  actions:
+    type: array
+    items:
+      type: string
+      enum: [index, show, create, update, delete]
+    default: ["index", "show", "create", "update", "delete"]
+    description: "Controller actions to generate"
+  view_types:
+    type: array
+    items:
+      type: string
+      enum: [list, show, form, edit]
+    default: ["list", "show", "form", "edit"]
+    description: "View types to generate"
+required:
+  - model_name
+```
+
+**Output Schema**: Same as `loco.generate_model`
+
+**Examples**:
+```yaml
+# Input
+model_name: "product"
+actions: ["index", "show"]
+view_types: ["list", "show"]
+
+# Output
+success: true
+created_files:
+  - path: "src/controllers/products.rs"
+    type: "controller"
+    size_bytes: 1245
+  - path: "src/views/products/index.html.tera"
+    type: "view"
+    size_bytes: 723
+  - path: "src/views/products/show.html.tera"
+    type: "view"
+    size_bytes: 412
+modified_files:
+  - path: "src/routes/mod.rs"
+    type: "route"
+errors: []
+```
+
+## Error Response Format
+
+All tools return errors in a consistent format:
+
+```yaml
+errors:
+  - code: "VALIDATION_ERROR"
+    message: "Invalid model name: '123invalid' must start with a letter"
+    field: "model_name"
+  - code: "FILE_EXISTS_ERROR"
+    message: "Model file already exists: src/models/user.rs"
+    field: null
+```
+
+### Error Codes
+
+**Validation Errors**:
+- `INVALID_MODEL_NAME`: Model name doesn't follow conventions
+- `INVALID_FIELD_NAME`: Field name doesn't follow conventions
+- `UNSUPPORTED_FIELD_TYPE`: Field type not supported
+- `INVALID_FIELD_DEFINITION`: Field definition format invalid
+
+**File System Errors**:
+- `FILE_EXISTS_ERROR`: Target file already exists
+- `PERMISSION_DENIED`: Insufficient permissions
+- `NOT_LOCO_PROJECT`: Not a valid loco-rs project
+
+**Runtime Errors**:
+- `MODEL_ALREADY_EXISTS`: Model already exists
+- `MODEL_NOT_FOUND`: Model doesn't exist (for controller/view generation)
+- `TEMPLATE_ERROR`: Template processing failed
+
+## Performance Requirements
+
+- Response time: <10ms for typical operations
+- Throughput: >100 operations/second
+- Memory usage: <10MB per operation
+- Error rate: <1% for valid inputs
+
+## Testing Requirements
+
+- Unit tests for all validation logic
+- Integration tests for file generation
+- Performance tests for response time validation
+- Error handling tests for all error codes
+- Contract compliance tests for all tools
