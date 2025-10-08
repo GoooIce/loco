@@ -1,19 +1,12 @@
 <!--
 Sync Impact Report:
-- Version change: Initial template → 1.0.0
-- Added principles:
-  * I. Simplicity & DRY (Don't Repeat Yourself)
-  * II. Thin Binding Layers
-  * III. Direct Integration Over Re-implementation
-  * IV. Maintainability First
-  * V. Performance Through Native Code
+- Version change: 1.0.0 → 1.1.0
+- Modified principles: None
 - Added sections:
-  * Development Workflow
-  * Governance
+  * Development Workflow › Constitution Check Gates
+- Removed sections: None
 - Templates requiring updates:
-  ✅ plan-template.md (aligned with constitution principles)
-  ✅ spec-template.md (aligned with testable requirements)
-  ✅ tasks-template.md (aligned with TDD workflow)
+  ✅ .specify/templates/plan-template.md (Constitution gates synced)
 - Follow-up TODOs: None
 -->
 
@@ -104,6 +97,17 @@ Loco is built on Rust for performance. Integration layers MUST NOT introduce sig
 - **Refactoring Documentation**: MUST document major refactorings with before/after metrics
 - **Example Code**: MUST provide working examples for all public APIs
 
+### Constitution Check Gates
+
+Each feature proposal MUST pass these gates before work begins and after significant design updates.
+
+- **G1 Simplicity & DRY**: Demonstrate reuse of existing core capabilities and eliminate duplicate logic.
+- **G2 Thin Binding Layers**: Keep integration layers limited to type conversion and interface glue with zero business logic.
+- **G3 Direct Integration**: Route all generation, validation, and templating through loco-gen without local substitutes.
+- **G4 Maintainability First**: Show that module boundaries remain focused, dependencies justified, and debt reduction opportunities captured.
+- **G5 Performance Through Native Code**: Avoid adding caches, thread pools, or speculative optimizations outside the Rust core unless backed by benchmarks.
+- **G6 Workflow Discipline**: Confirm test-first sequencing, documentation updates, and compliance review steps are planned per Development Workflow standards.
+
 ## Governance
 
 ### Amendment Process
@@ -125,4 +129,4 @@ This constitution can be amended through:
 
 This constitution reflects learnings from real refactoring experiences (loco-bindings 2025-10-04). As the project evolves, principles may be added, refined, or amended based on demonstrated value.
 
-**Version**: 1.0.0 | **Ratified**: 2025-10-04 | **Last Amended**: 2025-10-04
+**Version**: 1.1.0 | **Ratified**: 2025-10-04 | **Last Amended**: 2025-10-08

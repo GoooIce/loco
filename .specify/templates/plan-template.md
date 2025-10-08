@@ -47,7 +47,12 @@
 ## Constitution Check
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- **G1 Simplicity & DRY**: Confirm plan reuses existing loco-gen capabilities and eliminates duplicate logic.
+- **G2 Thin Binding Layers**: Verify integration scope is limited to type conversion + interface glue with no business logic.
+- **G3 Direct Integration**: Ensure all generation, validation, and templating calls route through loco-gen APIs.
+- **G4 Maintainability First**: Demonstrate focused modules, justified dependencies, and identified refactor opportunities.
+- **G5 Performance Through Native Code**: Reject added caches/thread pools unless plan cites benchmarks proving necessity.
+- **G6 Workflow Discipline**: Show test-first sequencing, documentation updates, and compliance review steps are embedded in execution plan.
 
 ## Project Structure
 
@@ -216,4 +221,4 @@ directories captured above]
 - [ ] Complexity deviations documented
 
 ---
-*Based on Constitution v2.1.1 - See `/memory/constitution.md`*
+*Based on Constitution v1.1.0 - See `/memory/constitution.md`*
