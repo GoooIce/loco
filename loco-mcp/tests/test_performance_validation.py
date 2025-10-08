@@ -625,7 +625,7 @@ loco-rs = "0.3"
 class TestPerformanceValidation:
     """Comprehensive performance validation"""
 
-    def test_complete_performance_validation(self):
+    async def test_complete_performance_validation(self):
         """Run complete performance validation suite"""
         print(f"\n{'='*80}")
         print(f"COMPLETE PERFORMANCE VALIDATION SUITE")

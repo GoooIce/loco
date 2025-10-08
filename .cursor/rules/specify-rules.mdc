@@ -1,0 +1,25 @@
+# loco Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2025-10-08
+
+## Active Technologies
+- (002-loco-bindings-mcp)
+
+## Project Structure
+```
+backend/
+frontend/
+tests/
+```
+
+## Commands
+# Add commands for 
+
+## Code Style
+: Follow standard conventions
+
+## Recent Changes
+- 002-loco-bindings-mcp: Added
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->

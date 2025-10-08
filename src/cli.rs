@@ -40,6 +40,63 @@ use crate::{
     logger, task, Error,
 };
 
+/// Programmatic entry point for database migration without Clap context
+#[cfg(feature = "with-db")]
+pub async fn migrate_db_programmatic<H: Hooks, M: MigratorTrait>(
+    project_path: &str,
+    environment: Option<String>,
+) -> Result<String, Error> {
+    let env: Environment = environment.unwrap_or_else(resolve_from_env).into();
+    let config = H::load_config(&env).await?;
+    let app_context = create_context::<H>(&env, config).await?;
+    
+    if !H::init_logger(&app_context)? {
+        logger::init::<H>(&app_context.config.logger)?;
+    }
+    
+    run_db::<H, M>(&app_context, RunDbCommand::Migrate).await?;
+    Ok("Database migration completed successfully".to_string())
+}
+
+/// Programmatic entry point for running tasks without Clap context
+pub async fn run_task_programmatic<H: Hooks>(
+    project_path: &str,
+    task_name: &str,
+    task_params: Vec<(String, String)>,
+    environment: Option<String>,
+) -> Result<String, Error> {
+    let env: Environment = environment.unwrap_or_else(resolve_from_env).into();
+    let config = H::load_config(&env).await?;
+    let app_context = create_context::<H>(&env, config).await?;
+    
+    if !H::init_logger(&app_context)? {
+        logger::init::<H>(&app_context.config.logger)?;
+    }
+    
+    let vars = task::Vars::from_cli_args(&task_params);
+    run_task::<H>(&app_context, Some(&task_name.to_string()), &vars).await?;
+    Ok(format!("Task '{}' completed successfully", task_name))
+}
+
+/// Programmatic entry point for running scheduler without Clap context
+pub async fn run_scheduler_programmatic<H: Hooks>(
+    project_path: &str,
+    job_name: Option<String>,
+    job_tag: Option<String>,
+    environment: Option<String>,
+) -> Result<String, Error> {
+    let env: Environment = environment.unwrap_or_else(resolve_from_env).into();
+    let config = H::load_config(&env).await?;
+    let app_context = create_context::<H>(&env, config).await?;
+    
+    if !H::init_logger(&app_context)? {
+        logger::init::<H>(&app_context.config.logger)?;
+    }
+    
+    run_scheduler::<H>(&app_context, None, job_name, job_tag, false).await?;
+    Ok("Scheduler job completed successfully".to_string())
+}
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]

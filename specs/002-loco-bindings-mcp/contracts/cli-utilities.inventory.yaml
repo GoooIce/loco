@@ -1,0 +1,66 @@
+cli_utilities:
+  - id: migrate-db
+    name: "数据库迁移"
+    description: "执行数据库模式迁移"
+    owner: "数据平台组"
+    usage_frequency: "daily"
+    risk: "high"
+    compliance_notes: "需要审计日志"
+    automation_coverage: "70%"
+    priority: 1
+    timeout: 60
+    dependencies:
+      - "postgres"
+      - "redis"
+    approvals:
+      - "ops_lead"
+      - "security_officer"
+    mcp_tool_name: "migrate_db"
+    default_environment: "development"
+    guardrails:
+      - "只读模式验证"
+      - "备份检查"
+      - "非高峰时段执行"
+    audit_log_path: "/var/log/loco-mcp/audit.log"
+  - id: rotate-keys
+    name: "密钥轮换"
+    description: "轮换所有服务账号密钥"
+    owner: "安全团队"
+    usage_frequency: "weekly"
+    risk: "critical"
+    compliance_notes: "SOX 控制"
+    automation_coverage: "40%"
+    priority: 2
+    timeout: 300
+    dependencies:
+      - "kms"
+    approvals:
+      - "security_officer"
+      - "cto"
+    mcp_tool_name: "rotate_keys"
+    default_environment: "production"
+    guardrails:
+      - "CTO 强制审批"
+      - "密钥备份验证"
+      - "服务中断通知"
+    audit_log_path: "/var/log/loco-mcp/audit.log"
+  - id: clean-temp
+    name: "临时文件清理"
+    description: "清理应用临时目录"
+    owner: "平台工程"
+    usage_frequency: "daily"
+    risk: "low"
+    compliance_notes: "N/A"
+    automation_coverage: "90%"
+    priority: 3
+    timeout: 60
+    dependencies:
+      - "fs-local"
+    approvals:
+      - "ops_lead"
+    mcp_tool_name: "clean_temp"
+    default_environment: "development"
+    guardrails:
+      - "磁盘空间检查"
+      - "文件年龄验证"
+    audit_log_path: "/var/log/loco-mcp/audit.log"

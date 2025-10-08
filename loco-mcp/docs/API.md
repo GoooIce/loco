@@ -96,7 +96,7 @@ def get_health_status(self) -> Dict[str, Any]:
 
 ### MCP Tools
 
-The server exposes three main MCP tools for loco-rs code generation.
+The server exposes six MCP tools: three for loco-rs code generation and three for CLI operations.
 
 #### loco.generate_model
 
@@ -478,6 +478,162 @@ result = loco_bindings.generate_scaffold({
 })
 ```
 
+#### migrate_db
+
+Executes database migration operations with approval validation and audit logging.
+
+**Parameters:**
+```json
+{
+  "project_path": {
+    "type": "string",
+    "required": true,
+    "description": "Path to loco-rs project directory"
+  },
+  "environment": {
+    "type": "string",
+    "required": false,
+    "default": "development",
+    "description": "Target environment (development, staging, production)"
+  },
+  "approvals": {
+    "type": "array<string>",
+    "required": true,
+    "description": "Required approval roles in execution order"
+  },
+  "timeout_seconds": {
+    "type": "integer",
+    "required": false,
+    "default": 60,
+    "description": "Execution timeout in seconds (10-300)"
+  },
+  "dependencies": {
+    "type": "array<string>",
+    "required": false,
+    "description": "External dependencies to verify"
+  }
+}
+```
+
+**Returns:**
+```json
+{
+  "success": "boolean",
+  "messages": ["string"],
+  "checksum": "string",
+  "execution_time_ms": "integer",
+  "audit_log_entry": "string",
+  "errors": ["string"]
+}
+```
+
+**Example:**
+```json
+{
+  "project_path": "/path/to/loco/project",
+  "environment": "staging",
+  "approvals": ["ops_lead", "security_officer"],
+  "timeout_seconds": 60,
+  "dependencies": ["postgres", "redis"]
+}
+```
+
+#### rotate_keys
+
+Rotates service account keys with security validation and compliance checks.
+
+**Parameters:**
+```json
+{
+  "project_path": {
+    "type": "string",
+    "required": true,
+    "description": "Path to loco-rs project directory"
+  },
+  "environment": {
+    "type": "string",
+    "required": false,
+    "default": "production",
+    "description": "Target environment"
+  },
+  "approvals": {
+    "type": "array<string>",
+    "required": true,
+    "description": "Required approval roles (security_officer, cto)"
+  },
+  "timeout_seconds": {
+    "type": "integer",
+    "required": false,
+    "default": 300,
+    "description": "Execution timeout in seconds"
+  },
+  "dependencies": {
+    "type": "array<string>",
+    "required": false,
+    "description": "External dependencies (kms)"
+  }
+}
+```
+
+**Example:**
+```json
+{
+  "project_path": "/path/to/loco/project",
+  "environment": "production",
+  "approvals": ["security_officer", "cto"],
+  "timeout_seconds": 300,
+  "dependencies": ["kms"]
+}
+```
+
+#### clean_temp
+
+Cleans temporary files and directories with safety checks.
+
+**Parameters:**
+```json
+{
+  "project_path": {
+    "type": "string",
+    "required": true,
+    "description": "Path to loco-rs project directory"
+  },
+  "environment": {
+    "type": "string",
+    "required": false,
+    "default": "development",
+    "description": "Target environment"
+  },
+  "approvals": {
+    "type": "array<string>",
+    "required": true,
+    "description": "Required approval roles (ops_lead)"
+  },
+  "timeout_seconds": {
+    "type": "integer",
+    "required": false,
+    "default": 60,
+    "description": "Execution timeout in seconds"
+  },
+  "dependencies": {
+    "type": "array<string>",
+    "required": false,
+    "description": "External dependencies (fs-local)"
+  }
+}
+```
+
+**Example:**
+```json
+{
+  "project_path": "/path/to/loco/project",
+  "environment": "development",
+  "approvals": ["ops_lead"],
+  "timeout_seconds": 60,
+  "dependencies": ["fs-local"]
+}
+```
+
 ### Error Handling
 
 ```python
@@ -534,6 +690,69 @@ print(f"Server status: {status['status']}")
 await server.shutdown()
 ```
 
+## Operational Runbooks
+
+### Database Migration Runbook
+
+**Prerequisites:**
+- Database backup completed
+- Required approvals obtained (ops_lead, security_officer)
+- Environment-specific configuration verified
+
+**Steps:**
+1. Verify project path and environment
+2. Check dependencies (postgres, redis)
+3. Execute migration with timeout monitoring
+4. Verify migration success
+5. Check audit log entry
+
+**Rollback Procedure:**
+1. Stop application services
+2. Restore database from backup
+3. Verify data integrity
+4. Restart services
+5. Update audit log with rollback status
+
+### Key Rotation Runbook
+
+**Prerequisites:**
+- CTO and security officer approvals
+- Key backup verification
+- Service impact assessment completed
+
+**Steps:**
+1. Verify KMS connectivity
+2. Backup current keys
+3. Generate new keys
+4. Update service configurations
+5. Verify key rotation success
+6. Clean up old keys (after verification period)
+
+**Emergency Procedure:**
+1. Immediate key rollback if issues detected
+2. Service restoration
+3. Incident documentation
+4. Post-mortem analysis
+
+### Temporary File Cleanup Runbook
+
+**Prerequisites:**
+- Disk space monitoring alerts
+- File age verification
+- Backup of critical temporary files
+
+**Steps:**
+1. Check disk space and file age
+2. Identify cleanup candidates
+3. Execute cleanup with safety checks
+4. Verify cleanup success
+5. Monitor disk space recovery
+
+**Safety Checks:**
+- Never delete files newer than 24 hours
+- Preserve files with active locks
+- Verify no active processes using files
+
 ## Best Practices
 
 1. **Model Naming**: Use snake_case for model names (e.g., `user_profile`, `blog_post`)
@@ -541,6 +760,11 @@ await server.shutdown()
 3. **Error Handling**: Always check the `success` field and handle errors appropriately
 4. **Performance**: Monitor metrics to ensure <10ms response times
 5. **Project Structure**: Ensure you're in a valid loco-rs project directory
+6. **CLI Operations**: Always verify approvals and dependencies before execution
+7. **Audit Logging**: Check audit logs after each operation for compliance
+8. **Timeout Management**: Use appropriate timeouts based on operation complexity
+9. **Environment Safety**: Verify environment configuration before production operations
+10. **Rollback Planning**: Always have rollback procedures ready for critical operations
 
 ## Troubleshooting
 

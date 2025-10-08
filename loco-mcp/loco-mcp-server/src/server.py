@@ -14,6 +14,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
 from .tools import LocoTools
+from .config import ServerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -21,17 +22,18 @@ logger = logging.getLogger(__name__)
 class LocoMCPServer:
     """MCP server for loco-rs code generation."""
 
-    def __init__(self):
+    def __init__(self, config: ServerConfig = None):
         """Initialize the MCP server."""
+        self.config = config or ServerConfig.from_env()
         self.server = Server("loco-mcp")
-        self.tools = LocoTools()
+        self.tools = LocoTools(self.config)
         self._setup_logging()
         self._register_handlers()
 
     def _setup_logging(self) -> None:
         """Configure logging."""
         logging.basicConfig(
-            level=logging.INFO,
+            level=getattr(logging, self.config.log_level.upper()),
             format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S"
         )
@@ -144,6 +146,129 @@ class LocoMCPServer:
                         "required": ["project_path", "name"],
                     },
                 ),
+                Tool(
+                    name="migrate_db",
+                    description=(
+                        "Execute database schema migration. "
+                        "Runs pending migrations to update database structure."
+                    ),
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "project_path": {
+                                "type": "string",
+                                "description": "Path to the Loco project root (must contain Cargo.toml)",
+                            },
+                            "environment": {
+                                "type": "string",
+                                "description": "Environment name (e.g., 'development', 'staging', 'production')",
+                                "default": "development",
+                            },
+                            "approvals": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Required approvals in order: ['ops_lead', 'security_officer']",
+                                "default": ["ops_lead", "security_officer"],
+                            },
+                            "timeout_seconds": {
+                                "type": "integer",
+                                "description": "Execution timeout in seconds (10-300)",
+                                "minimum": 10,
+                                "maximum": 300,
+                                "default": 60,
+                            },
+                            "dependencies": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Required dependencies: ['postgres', 'redis']",
+                                "default": ["postgres", "redis"],
+                            },
+                        },
+                        "required": ["project_path", "approvals"],
+                    },
+                ),
+                Tool(
+                    name="rotate_keys",
+                    description=(
+                        "Rotate all service account keys. "
+                        "Critical security operation requiring CTO approval."
+                    ),
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "project_path": {
+                                "type": "string",
+                                "description": "Path to the Loco project root (must contain Cargo.toml)",
+                            },
+                            "environment": {
+                                "type": "string",
+                                "description": "Environment name (e.g., 'development', 'staging', 'production')",
+                                "default": "production",
+                            },
+                            "approvals": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Required approvals in order: ['security_officer', 'cto']",
+                                "default": ["security_officer", "cto"],
+                            },
+                            "timeout_seconds": {
+                                "type": "integer",
+                                "description": "Execution timeout in seconds (10-300)",
+                                "minimum": 10,
+                                "maximum": 300,
+                                "default": 300,
+                            },
+                            "dependencies": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Required dependencies: ['kms']",
+                                "default": ["kms"],
+                            },
+                        },
+                        "required": ["project_path", "approvals"],
+                    },
+                ),
+                Tool(
+                    name="clean_temp",
+                    description=(
+                        "Clean application temporary directories. "
+                        "Low-risk maintenance operation for disk space management."
+                    ),
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "project_path": {
+                                "type": "string",
+                                "description": "Path to the Loco project root (must contain Cargo.toml)",
+                            },
+                            "environment": {
+                                "type": "string",
+                                "description": "Environment name (e.g., 'development', 'staging', 'production')",
+                                "default": "development",
+                            },
+                            "approvals": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Required approvals: ['ops_lead']",
+                                "default": ["ops_lead"],
+                            },
+                            "timeout_seconds": {
+                                "type": "integer",
+                                "description": "Execution timeout in seconds (10-300)",
+                                "minimum": 10,
+                                "maximum": 300,
+                                "default": 60,
+                            },
+                            "dependencies": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Required dependencies: ['fs-local']",
+                                "default": ["fs-local"],
+                            },
+                        },
+                        "required": ["project_path", "approvals"],
+                    },
+                ),
             ]
 
         @self.server.call_tool()
@@ -173,6 +298,30 @@ class LocoMCPServer:
                         name=arguments["name"],
                         actions=arguments.get("actions", ["index", "show", "create", "update", "delete"]),
                         kind=arguments.get("kind", "api"),
+                    )
+                elif name == "migrate_db":
+                    result = await self.tools.migrate_db(
+                        project_path=arguments["project_path"],
+                        environment=arguments.get("environment"),
+                        approvals=arguments["approvals"],
+                        timeout_seconds=arguments.get("timeout_seconds", 60),
+                        dependencies=arguments.get("dependencies", ["postgres", "redis"]),
+                    )
+                elif name == "rotate_keys":
+                    result = await self.tools.rotate_keys(
+                        project_path=arguments["project_path"],
+                        environment=arguments.get("environment"),
+                        approvals=arguments["approvals"],
+                        timeout_seconds=arguments.get("timeout_seconds", 300),
+                        dependencies=arguments.get("dependencies", ["kms"]),
+                    )
+                elif name == "clean_temp":
+                    result = await self.tools.clean_temp(
+                        project_path=arguments["project_path"],
+                        environment=arguments.get("environment"),
+                        approvals=arguments["approvals"],
+                        timeout_seconds=arguments.get("timeout_seconds", 60),
+                        dependencies=arguments.get("dependencies", ["fs-local"]),
                     )
                 else:
                     raise ValueError(f"Unknown tool: {name}")

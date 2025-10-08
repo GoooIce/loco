@@ -1,388 +1,296 @@
 """
-Comprehensive input validation for MCP tool parameters.
+Execution Assurance Record persistence utilities.
 
-This module provides robust validation for all tool parameters with
-detailed error reporting and suggestions for fixing common issues.
+This module provides utilities for recording and validating execution assurance
+records to ensure MCP tools match CLI behaviors and remain compliant.
 """
 
-import re
-import os
-from typing import Any, Dict, List, Optional, Union
-from dataclasses import dataclass
+import json
+import hashlib
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass, asdict
+from enum import Enum
 
-from .error_handling import ValidationError, error_handler
+logger = logging.getLogger(__name__)
+
+
+class ValidationStatus(Enum):
+    """Validation status enumeration."""
+    PASS = "pass"
+    FAIL = "fail"
+    WAIVED = "waived"
 
 
 @dataclass
-class ValidationRule:
-    """Represents a validation rule for a parameter."""
-    name: str
-    required: bool = True
-    validator: callable = None
-    description: str = ""
-    error_message: str = ""
+class ExecutionAssuranceRecord:
+    """Execution Assurance Record data structure."""
+    cli_id: str
+    verification_run_id: str
+    expected_checksum: str
+    actual_checksum: str
+    variance_notes: Optional[str] = None
+    tester: str = "mcp_client"
+    run_timestamp: str = None
+    status: ValidationStatus = ValidationStatus.PASS
+    
+    def __post_init__(self):
+        if self.run_timestamp is None:
+            self.run_timestamp = datetime.utcnow().isoformat()
 
 
-class ParameterValidator:
-    """Comprehensive parameter validation for MCP tools."""
-
-    def __init__(self):
-        self.field_type_pattern = re.compile(r'^[a-z][a-z0-9_]*:(string|i32|i64|f32|f64|boolean|datetime|uuid|json|text)(:unique|:primary_key|:nullable|:optional|:default:[^:]+)*$')
-        self.model_name_pattern = re.compile(r'^[a-z][a-z0-9_]{1,63}$')
-        self.reserved_keywords = {
-            'id', 'type', 'struct', 'enum', 'impl', 'fn', 'let', 'mut',
-            'if', 'else', 'for', 'while', 'loop', 'match', 'break', 'continue',
-            'return', 'async', 'await', 'mod', 'use', 'pub', 'trait'
+class ExecutionAssuranceValidator:
+    """Validator for execution assurance records."""
+    
+    def __init__(self, records_path: str = "/var/log/loco-mcp/execution_assurance.jsonl"):
+        """Initialize the validator.
+        
+        Args:
+            records_path: Path to the execution assurance records file
+        """
+        self.records_path = Path(records_path)
+        self._ensure_directory()
+    
+    def _ensure_directory(self) -> None:
+        """Ensure the directory for records exists."""
+        self.records_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    def calculate_checksum(self, data: Any) -> str:
+        """Calculate SHA256 checksum of data.
+        
+        Args:
+            data: Data to calculate checksum for
+            
+        Returns:
+            SHA256 checksum as hex string
+        """
+        if isinstance(data, dict):
+            # Sort keys for consistent hashing
+            data_str = json.dumps(data, sort_keys=True)
+        else:
+            data_str = str(data)
+        
+        return hashlib.sha256(data_str.encode()).hexdigest()
+    
+    def record_execution(
+        self,
+        cli_id: str,
+        expected_result: Dict[str, Any],
+        actual_result: Dict[str, Any],
+        tester: str = "mcp_client",
+        variance_notes: Optional[str] = None
+    ) -> ExecutionAssuranceRecord:
+        """Record an execution assurance validation.
+        
+        Args:
+            cli_id: CLI utility identifier
+            expected_result: Expected result from CLI baseline
+            actual_result: Actual result from MCP invocation
+            tester: Name of the tester/operator
+            variance_notes: Notes about any variances
+            
+        Returns:
+            Execution assurance record
+        """
+        verification_run_id = f"{cli_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+        
+        expected_checksum = self.calculate_checksum(expected_result)
+        actual_checksum = self.calculate_checksum(actual_result)
+        
+        # Determine status
+        if expected_checksum == actual_checksum:
+            status = ValidationStatus.PASS
+        elif variance_notes:
+            status = ValidationStatus.WAIVED
+        else:
+            status = ValidationStatus.FAIL
+        
+        record = ExecutionAssuranceRecord(
+            cli_id=cli_id,
+            verification_run_id=verification_run_id,
+            expected_checksum=expected_checksum,
+            actual_checksum=actual_checksum,
+            variance_notes=variance_notes,
+            tester=tester,
+            status=status
+        )
+        
+        self._persist_record(record)
+        return record
+    
+    def _persist_record(self, record: ExecutionAssuranceRecord) -> None:
+        """Persist an execution assurance record to disk.
+        
+        Args:
+            record: Execution assurance record to persist
+        """
+        try:
+            # Convert to dict and handle enum serialization
+            record_dict = asdict(record)
+            record_dict["status"] = record.status.value
+            
+            with open(self.records_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record_dict) + "\n")
+            
+            logger.info(f"Execution assurance record persisted: {record.verification_run_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to persist execution assurance record: {e}")
+            raise
+    
+    def get_records_for_cli(self, cli_id: str) -> List[ExecutionAssuranceRecord]:
+        """Get all execution assurance records for a CLI utility.
+        
+        Args:
+            cli_id: CLI utility identifier
+            
+        Returns:
+            List of execution assurance records
+        """
+        records = []
+        
+        if not self.records_path.exists():
+            return records
+        
+        try:
+            with open(self.records_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        record_data = json.loads(line)
+                        if record_data.get("cli_id") == cli_id:
+                            # Convert status back to enum
+                            record_data["status"] = ValidationStatus(record_data["status"])
+                            records.append(ExecutionAssuranceRecord(**record_data))
+            
+        except Exception as e:
+            logger.error(f"Failed to read execution assurance records: {e}")
+        
+        return records
+    
+    def get_latest_record(self, cli_id: str) -> Optional[ExecutionAssuranceRecord]:
+        """Get the latest execution assurance record for a CLI utility.
+        
+        Args:
+            cli_id: CLI utility identifier
+            
+        Returns:
+            Latest execution assurance record or None
+        """
+        records = self.get_records_for_cli(cli_id)
+        if not records:
+            return None
+        
+        # Sort by timestamp and return the latest
+        records.sort(key=lambda r: r.run_timestamp, reverse=True)
+        return records[0]
+    
+    def validate_parity(
+        self,
+        cli_id: str,
+        expected_result: Dict[str, Any],
+        actual_result: Dict[str, Any],
+        allow_variance: bool = False
+    ) -> bool:
+        """Validate parity between expected and actual results.
+        
+        Args:
+            cli_id: CLI utility identifier
+            expected_result: Expected result from CLI baseline
+            actual_result: Actual result from MCP invocation
+            allow_variance: Whether to allow variance with notes
+            
+        Returns:
+            True if validation passes, False otherwise
+        """
+        record = self.record_execution(
+            cli_id=cli_id,
+            expected_result=expected_result,
+            actual_result=actual_result,
+            variance_notes="Variance allowed" if allow_variance else None
+        )
+        
+        return record.status in [ValidationStatus.PASS, ValidationStatus.WAIVED]
+    
+    def get_validation_summary(self, cli_id: str) -> Dict[str, Any]:
+        """Get validation summary for a CLI utility.
+        
+        Args:
+            cli_id: CLI utility identifier
+            
+        Returns:
+            Validation summary dictionary
+        """
+        records = self.get_records_for_cli(cli_id)
+        
+        if not records:
+            return {
+                "cli_id": cli_id,
+                "total_validations": 0,
+                "pass_count": 0,
+                "fail_count": 0,
+                "waived_count": 0,
+                "pass_rate": 0.0,
+                "last_validation": None,
+                "status": "no_data"
+            }
+        
+        pass_count = sum(1 for r in records if r.status == ValidationStatus.PASS)
+        fail_count = sum(1 for r in records if r.status == ValidationStatus.FAIL)
+        waived_count = sum(1 for r in records if r.status == ValidationStatus.WAIVED)
+        
+        pass_rate = (pass_count + waived_count) / len(records) * 100
+        
+        # Get latest record
+        latest_record = max(records, key=lambda r: r.run_timestamp)
+        
+        return {
+            "cli_id": cli_id,
+            "total_validations": len(records),
+            "pass_count": pass_count,
+            "fail_count": fail_count,
+            "waived_count": waived_count,
+            "pass_rate": round(pass_rate, 2),
+            "last_validation": latest_record.run_timestamp,
+            "status": latest_record.status.value
         }
-
-    def validate_generate_model_params(self, params: Dict[str, Any]) -> None:
-        """Validate parameters for generate_model tool."""
-        rules = [
-            ValidationRule(
-                name="model_name",
-                required=True,
-                validator=self._validate_model_name,
-                description="Model name in snake_case (e.g., 'user_profile')"
-            ),
-            ValidationRule(
-                name="fields",
-                required=True,
-                validator=self._validate_field_list,
-                description="List of field definitions (e.g., ['name:string', 'email:string:unique'])"
-            ),
-            ValidationRule(
-                name="project_path",
-                required=False,
-                validator=self._validate_project_path,
-                description="Path to loco-rs project directory"
-            )
-        ]
-
-        self._validate_parameters(params, rules, "generate_model")
-
-    def validate_generate_scaffold_params(self, params: Dict[str, Any]) -> None:
-        """Validate parameters for generate_scaffold tool."""
-        rules = [
-            ValidationRule(
-                name="model_name",
-                required=True,
-                validator=self._validate_model_name,
-                description="Model name in snake_case"
-            ),
-            ValidationRule(
-                name="fields",
-                required=True,
-                validator=self._validate_field_list,
-                description="List of field definitions"
-            ),
-            ValidationRule(
-                name="include_views",
-                required=False,
-                validator=self._validate_boolean,
-                description="Whether to generate view templates"
-            ),
-            ValidationRule(
-                name="include_controllers",
-                required=False,
-                validator=self._validate_boolean,
-                description="Whether to generate controllers"
-            ),
-            ValidationRule(
-                name="api_only",
-                required=False,
-                validator=self._validate_boolean,
-                description="Generate API-only scaffolding (no views)"
-            ),
-            ValidationRule(
-                name="project_path",
-                required=False,
-                validator=self._validate_project_path,
-                description="Path to loco-rs project directory"
-            )
-        ]
-
-        self._validate_parameters(params, rules, "generate_scaffold")
-
-        # Additional cross-parameter validation
-        self._validate_scaffold_configuration(params)
-
-    def validate_generate_controller_view_params(self, params: Dict[str, Any]) -> None:
-        """Validate parameters for generate_controller_view tool."""
-        rules = [
-            ValidationRule(
-                name="model_name",
-                required=True,
-                validator=self._validate_model_name,
-                description="Name of existing model"
-            ),
-            ValidationRule(
-                name="actions",
-                required=False,
-                validator=self._validate_controller_actions,
-                description="List of controller actions to generate"
-            ),
-            ValidationRule(
-                name="view_types",
-                required=False,
-                validator=self._validate_view_types,
-                description="Types of views to generate"
-            ),
-            ValidationRule(
-                name="project_path",
-                required=False,
-                validator=self._validate_project_path,
-                description="Path to loco-rs project directory"
-            )
-        ]
-
-        self._validate_parameters(params, rules, "generate_controller_view")
-
-    def _validate_parameters(self, params: Dict[str, Any], rules: List[ValidationRule], tool_name: str) -> None:
-        """Validate parameters against a list of rules."""
-        # Check for unexpected parameters
-        expected_params = {rule.name for rule in rules}
-        provided_params = set(params.keys())
-        unexpected_params = provided_params - expected_params
-
-        if unexpected_params:
-            raise ValidationError(
-                f"Unexpected parameter(s) for {tool_name}: {', '.join(unexpected_params)}",
-                details={"unexpected_parameters": list(unexpected_params), "expected_parameters": list(expected_params)},
-                suggestions=[f"Remove unexpected parameter: {param}" for param in unexpected_params]
-            )
-
-        # Validate each required parameter
-        for rule in rules:
-            value = params.get(rule.name)
-
-            if rule.required and value is None:
-                raise ValidationError(
-                    f"Required parameter '{rule.name}' is missing for {tool_name}",
-                    details={"missing_parameter": rule.name},
-                    suggestions=[f"Add parameter '{rule.name}': {rule.description}"]
-                )
-
-            if value is not None:
-                try:
-                    rule.validator(value)
-                except Exception as e:
-                    raise ValidationError(
-                        f"Invalid value for parameter '{rule.name}': {e}",
-                        details={"parameter": rule.name, "invalid_value": value},
-                        suggestions=[f"Fix parameter '{rule.name}': {rule.description}"]
-                    ) from e
-
-    def _validate_model_name(self, model_name: Any) -> None:
-        """Validate model name."""
-        if not isinstance(model_name, str):
-            raise ValidationError("Model name must be a string")
-
-        if not model_name:
-            raise ValidationError("Model name cannot be empty")
-
-        if not self.model_name_pattern.match(model_name):
-            raise ValidationError(
-                f"Invalid model name: '{model_name}'. Must be snake_case, start with letter, max 64 characters",
-                details={"invalid_name": model_name}
-            )
-
-        if model_name in self.reserved_keywords:
-            raise ValidationError(
-                f"Model name '{model_name}' is a reserved keyword",
-                details={"reserved_keyword": model_name},
-                suggestions=[f"Use alternative name: {model_name}_model", f"Use alternative name: {model_name}_entity"]
-            )
-
-    def _validate_field_list(self, fields: Any) -> None:
-        """Validate list of field definitions."""
-        if not isinstance(fields, list):
-            raise ValidationError("Fields must be a list")
-
-        if not fields:
-            raise ValidationError("At least one field must be specified")
-
-        field_names = set()
-        for i, field in enumerate(fields):
-            if not isinstance(field, str):
-                raise ValidationError(f"Field definition at index {i} must be a string")
-
-            if not field.strip():
-                raise ValidationError(f"Field definition at index {i} cannot be empty")
-
-            # Validate field format
-            if not self.field_type_pattern.match(field.strip()):
-                raise ValidationError(
-                    f"Invalid field format: '{field}'. Expected format: 'name:type[:constraint]*'",
-                    details={
-                        "invalid_field": field,
-                        "index": i,
-                        "expected_format": "name:type[:constraint]",
-                        "examples": [
-                            "name:string",
-                            "email:string:unique",
-                            "price:i32",
-                            "published_at:datetime:nullable"
-                        ]
-                    },
-                    suggestions=[
-                        "Check field format",
-                        "Supported types: string, i32, i64, f32, f64, boolean, datetime, uuid, json, text",
-                        "Supported constraints: unique, primary_key, nullable, optional, default:<value>"
-                    ]
-                )
-
-            # Extract field name and check for duplicates
-            field_name = field.split(':')[0].strip()
-            if field_name in field_names:
-                raise ValidationError(
-                    f"Duplicate field name: '{field_name}'. Each field name must be unique",
-                    details={"duplicate_field": field_name},
-                    suggestions=[f"Remove or rename duplicate field: {field_name}"]
-                )
-            field_names.add(field_name)
-
-            # Validate field name constraints
-            if field_name == 'id':
-                raise ValidationError(
-                    "Field name 'id' is reserved for primary key",
-                    details={"reserved_field": "id"},
-                    suggestions=["Use a different field name", "Let the system handle the 'id' field automatically"]
-                )
-
-    def _validate_boolean(self, value: Any) -> None:
-        """Validate boolean parameter."""
-        if not isinstance(value, bool):
-            raise ValidationError("Parameter must be a boolean (true or false)")
-
-    def _validate_controller_actions(self, actions: Any) -> None:
-        """Validate controller actions list."""
-        if not isinstance(actions, list):
-            raise ValidationError("Actions must be a list")
-
-        valid_actions = {"index", "show", "create", "update", "delete", "edit", "new"}
-
-        for action in actions:
-            if not isinstance(action, str):
-                raise ValidationError("Each action must be a string")
-
-            if action not in valid_actions:
-                raise ValidationError(
-                    f"Invalid action: '{action}'",
-                    details={
-                        "invalid_action": action,
-                        "valid_actions": sorted(valid_actions)
-                    },
-                    suggestions=[f"Use one of: {', '.join(sorted(valid_actions))}"]
-                )
-
-    def _validate_view_types(self, view_types: Any) -> None:
-        """Validate view types list."""
-        if not isinstance(view_types, list):
-            raise ValidationError("View types must be a list")
-
-        valid_view_types = {"list", "show", "form", "edit", "new"}
-
-        for view_type in view_types:
-            if not isinstance(view_type, str):
-                raise ValidationError("Each view type must be a string")
-
-            if view_type not in valid_view_types:
-                raise ValidationError(
-                    f"Invalid view type: '{view_type}'",
-                    details={
-                        "invalid_view_type": view_type,
-                        "valid_view_types": sorted(valid_view_types)
-                    },
-                    suggestions=[f"Use one of: {', '.join(sorted(valid_view_types))}"]
-                )
-
-    def _validate_project_path(self, project_path: Any) -> None:
-        """Validate project path."""
-        if not isinstance(project_path, str):
-            raise ValidationError("Project path must be a string")
-
-        if not project_path.strip():
-            raise ValidationError("Project path cannot be empty")
-
-        # Normalize path
-        normalized_path = os.path.normpath(project_path)
-
-        # Check for basic path validity
-        if normalized_path.startswith(".."):
-            raise ValidationError("Project path cannot reference parent directories")
-
-        # Check for suspicious path patterns
-        if "~" in normalized_path and not normalized_path.startswith("~"):
-            raise ValidationError("Invalid tilde usage in project path")
-
-    def _validate_scaffold_configuration(self, params: Dict[str, Any]) -> None:
-        """Validate cross-parameter constraints for scaffold generation."""
-        include_views = params.get("include_views", True)
-        include_controllers = params.get("include_controllers", True)
-        api_only = params.get("api_only", False)
-
-        if api_only and include_views:
-            raise ValidationError(
-                "Cannot have both api_only=true and include_views=true",
-                details={
-                    "api_only": api_only,
-                    "include_views": include_views
-                },
-                suggestions=[
-                    "Set api_only=false for full scaffolding",
-                    "Set include_views=false for API-only scaffolding"
-                ]
-            )
-
-        if not include_controllers:
-            raise ValidationError(
-                "include_controllers=false is not supported yet",
-                details={"include_controllers": include_controllers},
-                suggestions=["Set include_controllers=true (default)"]
-            )
-
-    def validate_field_types(self, field_types: List[str]) -> None:
-        """Validate that field types are supported."""
-        supported_types = {"string", "i32", "i64", "f32", "f64", "boolean", "datetime", "uuid", "json", "text"}
-
-        for field_type in field_types:
-            if field_type not in supported_types:
-                raise ValidationError(
-                    f"Unsupported field type: '{field_type}'",
-                    details={
-                        "unsupported_type": field_type,
-                        "supported_types": sorted(supported_types)
-                    },
-                    suggestions=[f"Use one of: {', '.join(sorted(supported_types))}"]
-                )
-
-    def validate_field_constraints(self, field_name: str, constraints: List[str]) -> None:
-        """Validate field constraints."""
-        supported_constraints = {"unique", "primary_key", "nullable", "optional", "default"}
-
-        for constraint in constraints:
-            if constraint == "default":
-                continue  # Default values have their own validation
-
-            if constraint not in supported_constraints:
-                raise ValidationError(
-                    f"Unsupported constraint: '{constraint}' for field '{field_name}'",
-                    details={
-                        "field": field_name,
-                        "unsupported_constraint": constraint,
-                        "supported_constraints": sorted(supported_constraints)
-                    },
-                    suggestions=[f"Use one of: {', '.join(sorted(supported_constraints))}"]
-                )
-
-        # Check for conflicting constraints
-        if "nullable" in constraints and "optional" in constraints:
-            raise ValidationError(
-                f"Cannot specify both 'nullable' and 'optional' constraints for field '{field_name}'",
-                details={"field": field_name, "conflicting_constraints": ["nullable", "optional"]},
-                suggestions=["Use either 'nullable' or 'optional' (they are equivalent)"]
-            )
 
 
 # Global validator instance
-validator = ParameterValidator()
+# Use a test-safe records path by default
+import os
+records_path = os.environ.get("LOCO_MCP_RECORDS_PATH", "/tmp/loco-mcp-records.json")
+validator = ExecutionAssuranceValidator(records_path)
+
+
+def validate_mcp_cli_parity(
+    cli_id: str,
+    expected_result: Dict[str, Any],
+    actual_result: Dict[str, Any],
+    tester: str = "mcp_client"
+) -> bool:
+    """Convenience function to validate MCP-CLI parity.
+    
+    Args:
+        cli_id: CLI utility identifier
+        expected_result: Expected result from CLI baseline
+        actual_result: Actual result from MCP invocation
+        tester: Name of the tester/operator
+        
+    Returns:
+        True if validation passes, False otherwise
+    """
+    return validator.validate_parity(cli_id, expected_result, actual_result)
+
+
+def get_execution_assurance_summary(cli_id: str) -> Dict[str, Any]:
+    """Convenience function to get execution assurance summary.
+    
+    Args:
+        cli_id: CLI utility identifier
+        
+    Returns:
+        Validation summary dictionary
+    """
+    return validator.get_validation_summary(cli_id)

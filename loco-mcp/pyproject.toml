@@ -9,6 +9,7 @@ description = "Loco MCP workspace - contains loco-bindings and loco-mcp-server"
 requires-python = ">=3.11"
 dependencies = [
     "mcp[cli]>=1.16.0",
+    "pytest-asyncio>=1.2.0",
 ]
 # This is not an installable package, just a workspace marker
 
@@ -53,6 +54,7 @@ extend-exclude = '''
 [tool.pytest.ini_options]
 testpaths = ["loco-bindings/tests", "loco-mcp-server/tests"]
 python_files = ["test_*.py", "*_test.py"]
+asyncio_mode = "auto"
 
 [tool.mypy]
 python_version = "3.11"

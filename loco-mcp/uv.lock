@@ -357,6 +357,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "mcp", extra = ["cli"] },
+    { name = "pytest-asyncio" },
 ]
 
 [package.optional-dependencies]
@@ -374,6 +375,7 @@ requires-dist = [
     { name = "mcp", extras = ["cli"], specifier = ">=1.16.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
+    { name = "pytest-asyncio", specifier = ">=1.2.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
 ]

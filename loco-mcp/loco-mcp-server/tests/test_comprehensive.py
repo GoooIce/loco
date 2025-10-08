@@ -19,13 +19,12 @@ from typing import Dict, Any
 # Add the source directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from server import LocoMCPServer
-from tools import LocoTools
-from config import ServerConfig
-from validation import ParameterValidator
-from messaging import MessageFormatter
-from security import PathValidator, InputSanitizer, AccessController
-from error_handling import (
+from src.server import LocoMCPServer
+from src.tools import LocoTools
+from src.config import ServerConfig
+from src.validation import ExecutionAssuranceValidator, ExecutionAssuranceRecord
+from src.security import PathValidator, InputSanitizer, AccessController
+from src.error_handling import (
     ValidationError, FileOperationError, ProjectError,
     TemplateError, PerformanceError, ErrorHandler
 )
