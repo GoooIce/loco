@@ -317,7 +317,20 @@ except ImportError as e:
                 "messages": ["Temporary files cleaned successfully"],
                 "checksum": "clean_ghi789"
             }
-    
+
+        def create_project(self, project_name: str, template_type: str, destination_path: str,
+                          database_type: str = None, background_worker: str = None, asset_serving: bool = None) -> dict:
+            return {
+                "success": True,
+                "messages": [
+                    f"Created {template_type} project '{project_name}' at {destination_path}",
+                    "Project structure generated successfully",
+                    "Dependencies installed",
+                    "Configuration files created"
+                ],
+                "project_path": destination_path
+            }
+
     loco_bindings = MockLocoBindings()
 
 
@@ -454,36 +467,101 @@ class LocoTools:
             Generation result with success status and messages
         """
         self.stats["total_calls"] += 1
-        
+
         try:
             # Validate kind
             if kind not in ["api", "html", "htmx"]:
                 raise ValueError(f"Invalid controller kind: {kind}. Must be 'api', 'html', or 'htmx'")
-            
+
             # Default actions if not provided
             if actions is None:
                 actions = ["index", "show", "create", "update", "delete"]
-            
+
             logger.info(f"Generating {kind} controller '{name}' with actions: {actions}")
-            
+
             result = loco_bindings.generate_controller_view(
                 project_path=project_path,
                 name=name,
                 actions=actions,
                 kind=kind,
             )
-            
+
             if result.get("success"):
                 self.stats["successful_calls"] += 1
             else:
                 self.stats["failed_calls"] += 1
-            
+
             logger.info(f"Controller generation completed: {result.get('success')}")
             return result
 
         except Exception as e:
             self.stats["failed_calls"] += 1
             logger.error(f"Controller generation failed: {e}", exc_info=True)
+            return {
+                "success": False,
+                "messages": [f"错误: {str(e)}"]
+            }
+
+    async def create_project(
+        self,
+        project_name: str,
+        template_type: str,
+        destination_path: str,
+        database_type: str = None,
+        background_worker: str = None,
+        asset_serving: bool = None,
+    ) -> dict[str, Any]:
+        """Create a new Loco project.
+
+        Args:
+            project_name: Project name in snake_case
+            template_type: Template type - "saas", "rest_api", or "lightweight"
+            destination_path: Directory path where the project will be created
+            database_type: Database type - "postgres", "sqlite", or "mysql" (optional)
+            background_worker: Background worker - "redis", "postgres", "sqlite", or "none" (optional)
+            asset_serving: Enable static asset serving (optional)
+
+        Returns:
+            Project creation result with success status and messages
+        """
+        self.stats["total_calls"] += 1
+
+        try:
+            # Validate template_type
+            if template_type not in ["saas", "rest_api", "lightweight"]:
+                raise ValueError(f"Invalid template type: {template_type}. Must be 'saas', 'rest_api', or 'lightweight'")
+
+            # Validate database_type if provided
+            if database_type and database_type not in ["postgres", "sqlite", "mysql"]:
+                raise ValueError(f"Invalid database type: {database_type}. Must be 'postgres', 'sqlite', or 'mysql'")
+
+            # Validate background_worker if provided
+            if background_worker and background_worker not in ["redis", "postgres", "sqlite", "none"]:
+                raise ValueError(f"Invalid background worker: {background_worker}. Must be 'redis', 'postgres', 'sqlite', or 'none'")
+
+            logger.info(f"Creating {template_type} project '{project_name}' at {destination_path}")
+            logger.debug(f"Database: {database_type}, Worker: {background_worker}, Assets: {asset_serving}")
+
+            result = loco_bindings.create_project(
+                project_name=project_name,
+                template_type=template_type,
+                destination_path=destination_path,
+                database_type=database_type,
+                background_worker=background_worker,
+                asset_serving=asset_serving,
+            )
+
+            if result.get("success"):
+                self.stats["successful_calls"] += 1
+            else:
+                self.stats["failed_calls"] += 1
+
+            logger.info(f"Project creation completed: {result.get('success')}")
+            return result
+
+        except Exception as e:
+            self.stats["failed_calls"] += 1
+            logger.error(f"Project creation failed: {e}", exc_info=True)
             return {
                 "success": False,
                 "messages": [f"错误: {str(e)}"]

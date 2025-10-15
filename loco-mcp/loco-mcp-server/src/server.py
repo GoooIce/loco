@@ -147,6 +147,46 @@ class LocoMCPServer:
                     },
                 ),
                 Tool(
+                    name="loco_create_project",
+                    description=(
+                        "Create a new Loco project from scratch. "
+                        "Supports SaaS, REST API, and Lightweight templates with configurable options."
+                    ),
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "project_name": {
+                                "type": "string",
+                                "description": "Project name in snake_case (e.g., 'my_app', 'blog_platform')",
+                            },
+                            "template_type": {
+                                "type": "string",
+                                "enum": ["saas", "rest_api", "lightweight"],
+                                "description": "Project template type: 'saas' (full-featured), 'rest_api' (API-only), 'lightweight' (minimal)",
+                            },
+                            "destination_path": {
+                                "type": "string",
+                                "description": "Directory path where the project will be created",
+                            },
+                            "database_type": {
+                                "type": "string",
+                                "enum": ["postgres", "sqlite", "mysql"],
+                                "description": "Database type for the project (default: sqlite)",
+                            },
+                            "background_worker": {
+                                "type": "string",
+                                "enum": ["redis", "postgres", "sqlite", "none"],
+                                "description": "Background worker implementation (default: sqlite)",
+                            },
+                            "asset_serving": {
+                                "type": "boolean",
+                                "description": "Enable static asset serving (default: true)",
+                            },
+                        },
+                        "required": ["project_name", "template_type", "destination_path"],
+                    },
+                ),
+                Tool(
                     name="migrate_db",
                     description=(
                         "Execute database schema migration. "
@@ -298,6 +338,15 @@ class LocoMCPServer:
                         name=arguments["name"],
                         actions=arguments.get("actions", ["index", "show", "create", "update", "delete"]),
                         kind=arguments.get("kind", "api"),
+                    )
+                elif name == "loco_create_project":
+                    result = await self.tools.create_project(
+                        project_name=arguments["project_name"],
+                        template_type=arguments["template_type"],
+                        destination_path=arguments["destination_path"],
+                        database_type=arguments.get("database_type"),
+                        background_worker=arguments.get("background_worker"),
+                        asset_serving=arguments.get("asset_serving"),
                     )
                 elif name == "migrate_db":
                     result = await self.tools.migrate_db(
