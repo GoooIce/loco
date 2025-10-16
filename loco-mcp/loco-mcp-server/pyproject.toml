@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "loco-mcp-server"
-version = "0.1.0"
+version = "0.3.0"
 description = "MCP server for loco-rs framework"
 authors = [{name = "Loco Framework Contributors"}]
 license = {text = "MIT OR Apache-2.0"}
 requires-python = ">=3.11"
 dependencies = [
     "mcp>=1.0.0",
-    "loco-bindings>=0.1.0",
+    "loco-bindings>=0.3.0",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",

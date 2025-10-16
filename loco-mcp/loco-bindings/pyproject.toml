@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "loco-bindings"
-version = "0.1.0"
+version = "0.3.0"
 description = "High-performance Python bindings for loco-rs code generation"
 readme = "README.md"
 license = {text = "MIT OR Apache-2.0"}

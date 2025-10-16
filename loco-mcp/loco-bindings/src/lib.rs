@@ -6,6 +6,9 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use loco_gen::{self, Component, AppInfo, ScaffoldKind};
+use std::path::Path;
+use std::fs;
+use regex;
 
 mod error;
 use error::{ValidationError, FileOperationError, ProjectError};
@@ -725,7 +728,7 @@ fn create_saaS_files(
     database: &str,
     background_worker: &str,
     asset_serving: &str,
-) -> PyResult<(), PyObject> {
+) -> Result<(), PyErr> {
     use pyo3::exceptions::PyRuntimeError;
 
     let controllers_dir = dest_path.join("src/controllers");
@@ -765,7 +768,7 @@ fn create_api_files(
     created_files: &mut Vec<String>,
     messages: &mut Vec<String>,
     database: &str,
-) -> PyResult<(), PyObject> {
+) -> Result<(), PyErr> {
     use pyo3::exceptions::PyRuntimeError;
 
     let controllers_dir = dest_path.join("src/controllers");
@@ -796,38 +799,6 @@ pub fn routes() -> axum::Router {{
 
     messages.push("Created API controllers".to_string());
     Ok(())
-}
-    // Validate approvals
-    let required_approvals = vec!["ops_lead".to_string()];
-    if approvals != required_approvals {
-        return Err(PyErr::new::<ValidationError, _>(
-            "approvals must follow required order: ['ops_lead']"
-        ));
-    }
-    
-    // Validate timeout
-    let timeout = timeout_seconds.unwrap_or(60);
-    if timeout < 10 || timeout > 300 {
-        return Err(PyErr::new::<ValidationError, _>(
-            "timeout_seconds must be between 10 and 300"
-        ));
-    }
-    
-    // Validate dependencies
-    let required_deps = vec!["fs-local".to_string()];
-    if dependencies != required_deps {
-        return Err(PyErr::new::<ValidationError, _>(
-            "dependencies must include: ['fs-local']"
-        ));
-    }
-    
-    // For now, simulate the cleanup (actual implementation would call Rust CLI)
-    let response = PyDict::new_bound(py);
-    response.set_item("success", true)?;
-    response.set_item("messages", vec!["Temporary files cleaned successfully"])?;
-    response.set_item("checksum", "clean_ghi789")?;
-    
-    Ok(response.into())
 }
 
 /// Python module for loco-rs bindings
